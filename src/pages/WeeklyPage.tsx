@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { buildWeekRoutes, readWeekPlans, type WeekBuildSummary } from '../hooks/useDayPlan'
+import { useWeather } from '../hooks/useWeather'
 import { addDays, formatDateHeading, startOfWeek, todayStr } from '../lib/time'
 import type { AppSettings } from '../types'
 import type { usePatients } from '../hooks/usePatients'
@@ -13,6 +14,7 @@ interface Props {
 
 export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
   const { patients } = patientsApi
+  const { forecast: weather } = useWeather(settings.homeGeo)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayStr()))
   const [refreshKey, setRefreshKey] = useState(0)
   const [confirming, setConfirming] = useState(false)
@@ -39,7 +41,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
     setConfirming(false)
     // let the "Building..." state paint before the (synchronous) optimizer runs
     window.setTimeout(() => {
-      const result = buildWeekRoutes(weekStart, patients, settings)
+      const result = buildWeekRoutes(weekStart, patients, settings, weather?.daily)
       setSummary(result)
       setRefreshKey((k) => k + 1)
       setBuilding(false)
@@ -109,6 +111,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
           const visitCount = plan ? plan.patientIds.filter((id) => !plan.cancelledPatientIds.includes(id)).length : 0
           const hasConflicts = Boolean(plan?.result?.conflicts.length)
           const isToday = d === today
+          const dayWeather = weather?.daily[d]
 
           return (
             <button
@@ -118,15 +121,23 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
                 isToday ? 'bg-mint-50 border-primary-400' : 'bg-surface border-line-soft'
               }`}
             >
-              <div>
-                <div className="font-bold text-[16px] text-ink">{formatDateHeading(d)}</div>
-                <div className="text-[13px] text-muted">
-                  {visitCount === 0 ? 'No visits planned' : `${visitCount} visit${visitCount === 1 ? '' : 's'}`}
-                  {plan?.result && visitCount > 0 ? ` · ${plan.result.efficiency}% efficient` : ''}
-                  {hasConflicts ? ' · ⚠️ needs attention' : ''}
+              <div className="flex items-center gap-3 min-w-0">
+                {dayWeather && (
+                  <div className="text-center shrink-0 w-9">
+                    <div className="text-[19px] leading-none">{dayWeather.icon}</div>
+                    <div className="text-[11px] text-muted font-semibold mt-0.5">{dayWeather.tempMaxF}°</div>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-[16px] text-ink">{formatDateHeading(d)}</div>
+                  <div className="text-[13px] text-muted">
+                    {visitCount === 0 ? 'No visits planned' : `${visitCount} visit${visitCount === 1 ? '' : 's'}`}
+                    {plan?.result && visitCount > 0 ? ` · ${plan.result.efficiency}% efficient` : ''}
+                    {hasConflicts ? ' · ⚠️ needs attention' : ''}
+                  </div>
                 </div>
               </div>
-              <span className="text-[20px] text-faint">›</span>
+              <span className="text-[20px] text-faint shrink-0">›</span>
             </button>
           )
         })}

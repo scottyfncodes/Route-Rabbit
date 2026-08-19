@@ -2,18 +2,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
 import { buildRoute } from '../lib/routing'
 import { addDays, weekdayOf } from '../lib/time'
-import type { AppSettings, DayPlan, Patient } from '../types'
+import type { AppSettings, DayPlan, DayWeather, Patient } from '../types'
 
 const KEY = 'dayPlans'
 type DayPlanMap = Record<string, DayPlan>
 
 function defaultPlan(date: string, settings: AppSettings): DayPlan {
-  const home = { label: 'Home', address: settings.homeAddress, geo: settings.homeGeo }
+  const start = { label: 'Start', address: settings.homeAddress, geo: settings.homeGeo }
+  const end = settings.endAddress.trim()
+    ? { label: 'End', address: settings.endAddress, geo: settings.endGeo }
+    : { ...start, label: 'End' }
   return {
     date,
     dayStartTime: '08:00',
-    startLocation: home,
-    endLocation: home,
+    startLocation: start,
+    endLocation: end,
     patientIds: [],
     cancelledPatientIds: [],
     lunch: { enabled: true, earliest: '11:30', latest: '13:30', duration: 30 },
@@ -97,7 +100,12 @@ export interface WeekBuildSummary {
  * preferences (falling back to defaults for days with no saved plan yet), but
  * replaces that day's patient selection and result outright.
  */
-export function buildWeekRoutes(weekStart: string, patients: Patient[], settings: AppSettings): WeekBuildSummary {
+export function buildWeekRoutes(
+  weekStart: string,
+  patients: Patient[],
+  settings: AppSettings,
+  dailyWeather?: Record<string, DayWeather>,
+): WeekBuildSummary {
   const map = readStorage<DayPlanMap>(KEY, {})
   let totalVisits = 0
   let daysWithConflicts = 0
@@ -108,6 +116,7 @@ export function buildWeekRoutes(weekStart: string, patients: Patient[], settings
     const weekday = weekdayOf(date)
     const existing = map[date] ?? defaultPlan(date, settings)
     const dayPatients = patients.filter((p) => p.status === 'active' && p.availableDays.includes(weekday))
+    const weather = dailyWeather?.[date]
 
     const result = buildRoute({
       date,
@@ -117,6 +126,8 @@ export function buildWeekRoutes(weekStart: string, patients: Patient[], settings
       patients: dayPatients,
       lunch: existing.lunch,
       avgSpeedMph: settings.avgSpeedMph,
+      weatherImpact: weather?.impact,
+      weatherLabel: weather?.label,
     })
 
     map[date] = {

@@ -76,6 +76,7 @@ export interface BuiltRoute {
   efficiency: number // 0-100
   conflicts: RouteConflict[]
   googleMapsUrl: string | null
+  weatherNote: string | null
 }
 
 export interface RouteConflict {
@@ -86,9 +87,37 @@ export interface RouteConflict {
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export interface AppSettings {
+  /** Default start location for new days -- editable on the Home dashboard. */
   homeAddress: string
   homeGeo: GeoPoint | null
+  /** Default end location for new days. Empty = same as start. */
+  endAddress: string
+  endGeo: GeoPoint | null
   avgSpeedMph: number
   onboardingSeen: boolean
   themeMode: ThemeMode
+}
+
+export type WeatherImpact = 0 | 1 | 2 // 0 none, 1 caution (slower driving), 2 severe (much slower)
+
+export interface DayWeather {
+  date: string // YYYY-MM-DD
+  tempMaxF: number
+  tempMinF: number
+  icon: string
+  label: string
+  impact: WeatherImpact
+}
+
+export interface CurrentWeather {
+  tempF: number
+  icon: string
+  label: string
+  impact: WeatherImpact
+}
+
+export interface WeatherForecast {
+  fetchedAt: number
+  current: CurrentWeather
+  daily: Record<string, DayWeather>
 }

@@ -8,6 +8,7 @@ import { MapView } from '../components/route/MapView'
 import { QuickActions } from '../components/route/QuickActions'
 import { NextStopCard } from '../components/route/NextStopCard'
 import { useDayPlan } from '../hooks/useDayPlan'
+import { useWeather } from '../hooks/useWeather'
 import { buildRoute } from '../lib/routing'
 import { addDays, formatDateHeading, formatDuration, todayStr, weekdayOf } from '../lib/time'
 import type { AppSettings, BuiltRoute, Patient } from '../types'
@@ -18,6 +19,7 @@ interface Props {
   settings: AppSettings
   date: string
   onDateChange: (date: string) => void
+  onBack?: () => void
 }
 
 interface Delta {
@@ -26,9 +28,10 @@ interface Delta {
   newOrder: string
 }
 
-export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) {
+export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }: Props) {
   const { patients } = patientsApi
   const { plan, updatePlan, togglePatientInDay, restorePatientToday } = useDayPlan(date, settings)
+  const { forecast: weather } = useWeather(settings.homeGeo)
   const [showSetup, setShowSetup] = useState(!plan.result)
   const [delta, setDelta] = useState<Delta | null>(null)
 
@@ -46,6 +49,8 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
       .map((id) => patientsById.get(id))
       .filter((p): p is Patient => Boolean(p))
 
+    const dayWeather = weather?.daily[date]
+
     return buildRoute({
       date,
       dayStartTime: plan.dayStartTime,
@@ -54,6 +59,8 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
       patients: dayPatients,
       lunch: plan.lunch,
       avgSpeedMph: settings.avgSpeedMph,
+      weatherImpact: dayWeather?.impact,
+      weatherLabel: dayWeather?.label,
     })
   }
 
@@ -104,6 +111,11 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
 
   return (
     <div className="flex-1 flex flex-col">
+      {onBack && (
+        <button onClick={onBack} className="px-4 pt-5 text-[13px] font-semibold text-accent text-left w-fit">
+          ‹ Back to Week
+        </button>
+      )}
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
         <button onClick={() => onDateChange(addDays(date, -1))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent" aria-label="Previous day">
           ‹
@@ -137,6 +149,13 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
         ) : (
           <div className="px-4 space-y-4">
             <ConflictBanner conflicts={plan.result.conflicts} onEditRoute={() => setShowSetup(true)} />
+
+            {plan.result.weatherNote && (
+              <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl px-4 py-3.5 flex items-start gap-2.5">
+                <span className="text-[18px] leading-none">🌦️</span>
+                <p className="text-[13.5px] text-warning leading-snug">{plan.result.weatherNote}</p>
+              </div>
+            )}
 
             {delta && (
               <div className="bg-mint-50 border-2 border-mint-200 rounded-2xl px-4 py-3.5">

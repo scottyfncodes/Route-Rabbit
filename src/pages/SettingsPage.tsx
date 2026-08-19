@@ -68,16 +68,9 @@ export function SettingsPage({ settings, updateSettings, patientsApi }: Props) {
           </div>
         </section>
 
-        <section>
-          <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Home base address</h2>
-          <input
-            value={settings.homeAddress}
-            onChange={(e) => updateSettings({ homeAddress: e.target.value })}
-            placeholder="Where your day usually starts/ends"
-            className="w-full text-[16px] bg-surface rounded-2xl border border-line px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
-          />
-          <p className="text-[12.5px] text-muted mt-1.5">Used as the default start &amp; end location for new days.</p>
-        </section>
+        <p className="text-[12.5px] text-muted -mt-3">
+          Your start &amp; end location now lives on the <strong className="text-ink">Home</strong> tab.
+        </p>
 
         <section>
           <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Typical driving speed</h2>
@@ -102,7 +95,9 @@ export function SettingsPage({ settings, updateSettings, patientsApi }: Props) {
           <p className="text-[13.5px] text-ink leading-relaxed">
             This app is designed to store minimal scheduling information locally on your device. Do not enter protected health
             information. Patients are tracked by initials only -- no names, dates of birth, diagnoses, insurance, or medical
-            history. All data lives in your browser's local storage; nothing is sent to a server or cloud database.
+            history. All data lives in your browser's local storage; nothing is sent to a server or cloud database. Addresses
+            are looked up via a free map service, and your start location's coordinates are sent to a free weather service --
+            neither ever receives patient initials or any other identifying information.
           </p>
         </section>
 

@@ -1,7 +1,8 @@
-import type { BuiltRoute, LunchPreference, NamedLocation, Patient, RouteConflict, Stop } from '../types'
+import type { BuiltRoute, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, WeatherImpact } from '../types'
 import { estimateLeg } from './distance'
 import { buildDirectionsUrl } from './googleMaps'
 import { fromMinutes, toMinutes, weekdayOf } from './time'
+import { speedMultiplierFor, weatherAdvisory } from './weather'
 
 export interface RoutingInput {
   date: string
@@ -11,6 +12,9 @@ export interface RoutingInput {
   patients: Patient[]
   lunch: LunchPreference
   avgSpeedMph: number
+  /** Forecasted driving impact for this date, if known -- slows the effective speed used for every leg. */
+  weatherImpact?: WeatherImpact
+  weatherLabel?: string
 }
 
 const OPEN_BLOCK_THRESHOLD_MINUTES = 15
@@ -195,13 +199,15 @@ function buildStopId(prefix: string, key: string): string {
 }
 
 export function buildRoute(input: RoutingInput): BuiltRoute {
-  const { date, dayStartTime, startLocation, endLocation, patients, lunch, avgSpeedMph } = input
+  const { date, dayStartTime, startLocation, endLocation, patients, lunch, weatherImpact = 0, weatherLabel } = input
+  const avgSpeedMph = input.avgSpeedMph * speedMultiplierFor(weatherImpact)
   const weekday = weekdayOf(date)
   const dayStartMinutes = toMinutes(dayStartTime)
   const conflicts: RouteConflict[] = []
+  const weatherNote = weatherLabel ? weatherAdvisory(weatherImpact, weatherLabel) : null
 
   if (!startLocation.geo) {
-    conflicts.push({ message: `Starting location "${startLocation.label}" couldn't be located. Add a valid address in Settings.` })
+    conflicts.push({ message: `Starting location "${startLocation.label}" couldn't be located. Set a valid start address on the Home tab.` })
   }
 
   const eligible: Patient[] = []
@@ -365,5 +371,6 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     efficiency,
     conflicts,
     googleMapsUrl,
+    weatherNote,
   }
 }
