@@ -28,7 +28,7 @@ export default function App() {
 
       {tab === 'today' && <TodayPage patientsApi={patientsApi} settings={settings} date={date} onDateChange={setDate} />}
       {tab === 'patients' && <PatientsPage patientsApi={patientsApi} />}
-      {tab === 'weekly' && <WeeklyPage onSelectDate={goToDate} />}
+      {tab === 'weekly' && <WeeklyPage onSelectDate={goToDate} patientsApi={patientsApi} settings={settings} />}
       {tab === 'settings' && <SettingsPage settings={settings} updateSettings={updateSettings} patientsApi={patientsApi} />}
 
       <BottomNav active={tab} onChange={setTab} />

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
-import type { AppSettings, DayPlan } from '../types'
+import { buildRoute } from '../lib/routing'
+import { addDays, weekdayOf } from '../lib/time'
+import type { AppSettings, DayPlan, Patient } from '../types'
 
 const KEY = 'dayPlans'
 type DayPlanMap = Record<string, DayPlan>
@@ -80,4 +82,57 @@ export function useDayPlan(date: string, settings: AppSettings) {
 /** Visit counts per date, for the weekly view -- reads the raw stored map directly. */
 export function readWeekPlans(): DayPlanMap {
   return readStorage<DayPlanMap>(KEY, {})
+}
+
+export interface WeekBuildSummary {
+  daysBuilt: number
+  totalVisits: number
+  daysWithConflicts: number
+}
+
+/**
+ * Builds an optimized route for every day of the given week in one pass, using
+ * each active patient's own available days as their recurring weekly schedule.
+ * Keeps each day's existing start/end location, day-start time, and lunch
+ * preferences (falling back to defaults for days with no saved plan yet), but
+ * replaces that day's patient selection and result outright.
+ */
+export function buildWeekRoutes(weekStart: string, patients: Patient[], settings: AppSettings): WeekBuildSummary {
+  const map = readStorage<DayPlanMap>(KEY, {})
+  let totalVisits = 0
+  let daysWithConflicts = 0
+  let daysBuilt = 0
+
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(weekStart, i)
+    const weekday = weekdayOf(date)
+    const existing = map[date] ?? defaultPlan(date, settings)
+    const dayPatients = patients.filter((p) => p.status === 'active' && p.availableDays.includes(weekday))
+
+    const result = buildRoute({
+      date,
+      dayStartTime: existing.dayStartTime,
+      startLocation: existing.startLocation,
+      endLocation: existing.endLocation,
+      patients: dayPatients,
+      lunch: existing.lunch,
+      avgSpeedMph: settings.avgSpeedMph,
+    })
+
+    map[date] = {
+      ...existing,
+      patientIds: dayPatients.map((p) => p.id),
+      cancelledPatientIds: [],
+      activeStopId: null,
+      currentLocationOverride: null,
+      result,
+    }
+
+    daysBuilt += 1
+    totalVisits += result.visitCount
+    if (result.conflicts.length > 0) daysWithConflicts += 1
+  }
+
+  writeStorage(KEY, map)
+  return { daysBuilt, totalVisits, daysWithConflicts }
 }
