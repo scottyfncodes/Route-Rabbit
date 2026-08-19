@@ -1,0 +1,87 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+
+  --color-primary-50: #eef7f6;
+  --color-primary-100: #d3ebe8;
+  --color-primary-200: #a7d7d1;
+  --color-primary-300: #74bdb4;
+  --color-primary-400: #429e94;
+  --color-primary-500: #26827a;
+  --color-primary-600: #1a6a63;
+  --color-primary-700: #175650;
+  --color-primary-800: #144542;
+  --color-primary-900: #123936;
+
+  --color-mint-50: #f1faf4;
+  --color-mint-100: #dcf3e5;
+  --color-mint-200: #b8e6cd;
+
+  --color-coral-50: #fef3f1;
+  --color-coral-100: #fde3de;
+  --color-coral-500: #e2624b;
+  --color-coral-600: #c94f3a;
+  --color-coral-700: #a53f2d;
+
+  --color-amber-50: #fff8ec;
+  --color-amber-100: #ffedc7;
+  --color-amber-600: #b6790a;
+  --color-amber-700: #8f5c07;
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #f5f6f4;
+  color: #17201e;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: #f5f6f4;
+  position: relative;
+}
+
+button {
+  font-family: inherit;
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Large, consistent tap targets everywhere by default */
+button,
+a[role='button'] {
+  min-height: 44px;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
