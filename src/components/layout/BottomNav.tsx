@@ -1,3 +1,5 @@
+import { RabbitWheelIcon } from '../ui/RabbitWheelIcon'
+
 export type Tab = 'today' | 'patients' | 'weekly' | 'settings'
 
 interface Props {
@@ -6,7 +8,7 @@ interface Props {
 }
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
-  { key: 'today', label: 'Today', icon: '🗺️' },
+  { key: 'today', label: 'Home', icon: '' },
   { key: 'patients', label: 'Patients', icon: '🧑‍⚕️' },
   { key: 'weekly', label: 'Weekly', icon: '📅' },
   { key: 'settings', label: 'Settings', icon: '⚙️' },
@@ -26,7 +28,11 @@ export function BottomNav({ active, onChange }: Props) {
             active === tab.key ? 'text-accent' : 'text-faint'
           }`}
         >
-          <span className="text-[20px] leading-none">{tab.icon}</span>
+          {tab.key === 'today' ? (
+            <RabbitWheelIcon className="w-[22px] h-[22px]" />
+          ) : (
+            <span className="text-[20px] leading-none">{tab.icon}</span>
+          )}
           <span className={`text-[11px] ${active === tab.key ? 'font-bold' : 'font-medium'}`}>{tab.label}</span>
         </button>
       ))}
