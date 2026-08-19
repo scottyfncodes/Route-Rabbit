@@ -33,16 +33,16 @@ export function LocationInput({ label, value, onChange, placeholder }: Props) {
 
   return (
     <div>
-      <label className="block text-[13px] font-bold text-[#4a5a57] mb-1.5 uppercase tracking-wide">{label}</label>
+      <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">{label}</label>
       <div className="relative">
         <input
           value={text}
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full text-[16px] bg-white rounded-2xl border border-black/10 px-4 py-3.5 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-400"
+          className="w-full text-[16px] bg-surface rounded-2xl border border-line px-4 py-3.5 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-400"
         />
         {locating && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#7a8582]">…</span>
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-subtle">…</span>
         )}
       </div>
     </div>

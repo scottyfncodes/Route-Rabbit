@@ -83,9 +83,12 @@ export interface RouteConflict {
   message: string
 }
 
+export type ThemeMode = 'light' | 'dark' | 'system'
+
 export interface AppSettings {
   homeAddress: string
   homeGeo: GeoPoint | null
   avgSpeedMph: number
   onboardingSeen: boolean
+  themeMode: ThemeMode
 }

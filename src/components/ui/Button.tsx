@@ -5,10 +5,10 @@ type Size = 'md' | 'lg'
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: 'bg-primary-600 text-white active:bg-primary-700 disabled:bg-primary-200',
-  secondary: 'bg-mint-100 text-primary-800 active:bg-mint-200',
+  secondary: 'bg-mint-100 text-accent active:bg-mint-200',
   danger: 'bg-coral-600 text-white active:bg-coral-700',
-  outline: 'bg-white text-primary-700 border-2 border-primary-600 active:bg-primary-50',
-  ghost: 'bg-transparent text-primary-700 active:bg-primary-50',
+  outline: 'bg-surface text-accent border-2 border-primary-600 active:bg-primary-50',
+  ghost: 'bg-transparent text-accent active:bg-primary-50',
 }
 
 const SIZE_CLASSES: Record<Size, string> = {

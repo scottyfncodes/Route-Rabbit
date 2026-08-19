@@ -21,14 +21,14 @@ export function WeeklyPage({ onSelectDate }: Props) {
   return (
     <div className="flex-1 flex flex-col">
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
-        <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-primary-700">
+        <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
           ‹
         </button>
         <div className="text-center">
-          <h1 className="text-[19px] font-extrabold text-[#132825]">Week of {formatDateHeading(weekStart)}</h1>
-          <p className="text-[12.5px] text-[#5c6966]">{totalVisits} visits planned</p>
+          <h1 className="text-[19px] font-extrabold text-ink">Week of {formatDateHeading(weekStart)}</h1>
+          <p className="text-[12.5px] text-muted">{totalVisits} visits planned</p>
         </div>
-        <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-primary-700">
+        <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
           ›
         </button>
       </header>
@@ -45,17 +45,17 @@ export function WeeklyPage({ onSelectDate }: Props) {
               key={d}
               onClick={() => onSelectDate(d)}
               className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl border-2 text-left ${
-                isToday ? 'bg-mint-50 border-primary-400' : 'bg-white border-black/5'
+                isToday ? 'bg-mint-50 border-primary-400' : 'bg-surface border-line-soft'
               }`}
             >
               <div>
-                <div className="font-bold text-[16px] text-[#132825]">{formatDateHeading(d)}</div>
-                <div className="text-[13px] text-[#5c6966]">
+                <div className="font-bold text-[16px] text-ink">{formatDateHeading(d)}</div>
+                <div className="text-[13px] text-muted">
                   {visitCount === 0 ? 'No visits planned' : `${visitCount} visit${visitCount === 1 ? '' : 's'}`}
                   {built && plan?.result ? ` · ${plan.result.efficiency}% efficient` : ''}
                 </div>
               </div>
-              <span className="text-[20px] text-[#a9b3b0]">›</span>
+              <span className="text-[20px] text-faint">›</span>
             </button>
           )
         })}

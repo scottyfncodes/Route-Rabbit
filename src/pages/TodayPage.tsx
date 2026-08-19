@@ -105,20 +105,20 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
   return (
     <div className="flex-1 flex flex-col">
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
-        <button onClick={() => onDateChange(addDays(date, -1))} className="w-9 h-9 flex items-center justify-center text-[20px] text-primary-700" aria-label="Previous day">
+        <button onClick={() => onDateChange(addDays(date, -1))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent" aria-label="Previous day">
           ‹
         </button>
         <div className="text-center">
-          <h1 className="text-[19px] font-extrabold text-[#132825]">{formatDateHeading(date)}</h1>
+          <h1 className="text-[19px] font-extrabold text-ink">{formatDateHeading(date)}</h1>
           {date !== todayStr() && (
-            <button onClick={() => onDateChange(todayStr())} className="text-[12px] font-semibold text-primary-700">
+            <button onClick={() => onDateChange(todayStr())} className="text-[12px] font-semibold text-accent">
               Jump to today
             </button>
           )}
         </div>
         <button
           onClick={() => canGoNext && onDateChange(addDays(date, 1))}
-          className="w-9 h-9 flex items-center justify-center text-[20px] text-primary-700"
+          className="w-9 h-9 flex items-center justify-center text-[20px] text-accent"
           aria-label="Next day"
         >
           ›
@@ -140,16 +140,16 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
 
             {delta && (
               <div className="bg-mint-50 border-2 border-mint-200 rounded-2xl px-4 py-3.5">
-                <div className="font-bold text-[15px] text-primary-800 mb-0.5">Route rebuilt</div>
-                <div className="text-[14px] text-[#3a4c49] mb-1">{delta.newOrder || 'No visits remain'}</div>
+                <div className="font-bold text-[15px] text-accent mb-0.5">Route rebuilt</div>
+                <div className="text-[14px] text-ink mb-1">{delta.newOrder || 'No visits remain'}</div>
                 {delta.driveMinutesSaved !== 0 && (
-                  <div className="text-[13.5px] font-semibold text-primary-700">
+                  <div className="text-[13.5px] font-semibold text-accent">
                     {delta.driveMinutesSaved > 0
                       ? `${formatDuration(delta.driveMinutesSaved)} saved`
                       : `${formatDuration(Math.abs(delta.driveMinutesSaved))} more driving`}
                   </div>
                 )}
-                <button onClick={() => setDelta(null)} className="text-[12px] text-[#5c6966] mt-1.5 font-medium">
+                <button onClick={() => setDelta(null)} className="text-[12px] text-muted mt-1.5 font-medium">
                   Dismiss
                 </button>
               </div>
@@ -160,7 +160,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
                 🔄 REBUILD ROUTE
               </Button>
             </div>
-            <button onClick={() => setShowSetup(true)} className="w-full text-center text-[13.5px] font-semibold text-primary-700 -mt-2">
+            <button onClick={() => setShowSetup(true)} className="w-full text-center text-[13.5px] font-semibold text-accent -mt-2">
               Edit patients, times & locations
             </button>
 
@@ -181,17 +181,17 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
             {nextStop && <NextStopCard nextStop={nextStop} currentLocation={currentLocation} />}
 
             <div>
-              <h2 className="text-[13px] font-bold text-[#4a5a57] uppercase tracking-wide mb-2">On the road</h2>
+              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">On the road</h2>
               <QuickActions near={currentLocation} />
             </div>
 
             <div>
-              <h2 className="text-[13px] font-bold text-[#4a5a57] uppercase tracking-wide mb-2">Map</h2>
+              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Map</h2>
               <MapView stops={stops} />
             </div>
 
             <div>
-              <h2 className="text-[13px] font-bold text-[#4a5a57] uppercase tracking-wide mb-2">Timeline</h2>
+              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Timeline</h2>
               <Timeline
                 stops={stops}
                 patientsById={patientsById}
@@ -203,12 +203,12 @@ export function TodayPage({ patientsApi, settings, date, onDateChange }: Props) 
 
             {cancelledToday.length > 0 && (
               <div>
-                <h2 className="text-[13px] font-bold text-[#4a5a57] uppercase tracking-wide mb-2">Cancelled today</h2>
+                <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Cancelled today</h2>
                 <div className="space-y-2">
                   {cancelledToday.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between bg-white rounded-2xl border border-black/5 px-4 py-3">
-                      <span className="font-semibold text-[15px] text-[#132825] line-through">{p.initials}</span>
-                      <button onClick={() => handleRestorePatient(p.id)} className="text-[13.5px] font-bold text-primary-700">
+                    <div key={p.id} className="flex items-center justify-between bg-surface rounded-2xl border border-line-soft px-4 py-3">
+                      <span className="font-semibold text-[15px] text-ink line-through">{p.initials}</span>
+                      <button onClick={() => handleRestorePatient(p.id)} className="text-[13.5px] font-bold text-accent">
                         Add back + rebuild
                       </button>
                     </div>

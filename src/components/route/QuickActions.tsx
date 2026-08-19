@@ -22,7 +22,7 @@ export function QuickActions({ near, compact }: Props) {
           target="_blank"
           rel="noreferrer"
           role="button"
-          className={`flex flex-col items-center justify-center gap-1 rounded-2xl bg-white border border-black/5 font-bold text-[#132825] active:bg-mint-50 ${
+          className={`flex flex-col items-center justify-center gap-1 rounded-2xl bg-surface border border-line-soft font-bold text-ink active:bg-mint-50 ${
             compact ? 'py-3 text-[13px]' : 'py-4 text-[14px]'
           }`}
         >

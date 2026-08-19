@@ -1,8 +1,12 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
 
+  /* Brand scale: intentionally identical in light/dark -- these back solid,
+     saturated surfaces (buttons, the "on duty" banner) that always pair with
+     white text, so they don't need to shift with the theme. */
   --color-primary-50: #eef7f6;
   --color-primary-100: #d3ebe8;
   --color-primary-200: #a7d7d1;
@@ -28,11 +32,56 @@
   --color-amber-100: #ffedc7;
   --color-amber-600: #b6790a;
   --color-amber-700: #8f5c07;
+
+  /* Semantic tokens: these DO shift with the theme, redefined under .dark below. */
+  --color-app: #f5f6f4;
+  --color-surface: #ffffff;
+  --color-ink: #132825;
+  --color-muted: #5c6966;
+  --color-subtle: #7a8582;
+  --color-faint: #9aa3a0;
+  --color-label: #4a5a57;
+  --color-accent: #175650;
+  --color-danger: #c94f3a;
+  --color-warning: #b6790a;
+  --color-line-soft: rgb(0 0 0 / 0.05);
+  --color-line: rgb(0 0 0 / 0.1);
+  --color-line-strong: rgb(0 0 0 / 0.2);
 }
 
 :root {
   color-scheme: light;
   -webkit-tap-highlight-color: transparent;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-app: #0c1413;
+  --color-surface: #16211f;
+  --color-ink: #edf4f2;
+  --color-muted: #a7b4b1;
+  --color-subtle: #869390;
+  --color-faint: #62706c;
+  --color-label: #9db0ac;
+  --color-accent: #6cd0c0;
+  --color-danger: #ff9c86;
+  --color-warning: #f2c069;
+  --color-line-soft: rgb(255 255 255 / 0.06);
+  --color-line: rgb(255 255 255 / 0.12);
+  --color-line-strong: rgb(255 255 255 / 0.2);
+
+  /* Soft tint chips (banners, badges, selected rows) get low-alpha dark equivalents
+     instead of their light, near-white defaults. */
+  --color-primary-50: rgb(38 130 122 / 0.16);
+  --color-primary-100: rgb(38 130 122 / 0.26);
+  --color-mint-50: rgb(46 163 140 / 0.16);
+  --color-mint-100: rgb(46 163 140 / 0.26);
+  --color-mint-200: rgb(46 163 140 / 0.4);
+  --color-coral-50: rgb(226 98 75 / 0.16);
+  --color-coral-100: rgb(226 98 75 / 0.26);
+  --color-amber-50: rgb(182 121 10 / 0.18);
+  --color-amber-100: rgb(182 121 10 / 0.3);
 }
 
 * {
@@ -48,10 +97,11 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: #f5f6f4;
-  color: #17201e;
+  background: var(--color-app);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: contain;
+  transition: background-color 0.15s ease;
 }
 
 #root {
@@ -60,7 +110,7 @@ body {
   max-width: 560px;
   margin: 0 auto;
   min-height: 100dvh;
-  background: #f5f6f4;
+  background: var(--color-app);
   position: relative;
 }
 

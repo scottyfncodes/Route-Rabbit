@@ -10,10 +10,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   homeGeo: null,
   avgSpeedMph: 26,
   onboardingSeen: false,
+  themeMode: 'system',
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<AppSettings>(() => readStorage<AppSettings>(KEY, DEFAULT_SETTINGS))
+  const [settings, setSettings] = useState<AppSettings>(() => ({
+    ...DEFAULT_SETTINGS,
+    ...readStorage<Partial<AppSettings>>(KEY, {}),
+  }))
 
   useEffect(() => {
     writeStorage(KEY, settings)

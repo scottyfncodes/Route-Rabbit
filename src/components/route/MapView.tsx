@@ -29,7 +29,7 @@ export function MapView({ stops }: Props) {
   const located = stops.filter((s) => s.geo)
   if (located.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-black/5 px-4 py-8 text-center text-[14px] text-[#5c6966]">
+      <div className="bg-surface rounded-2xl border border-line-soft px-4 py-8 text-center text-[14px] text-muted">
         Map will appear once locations are found.
       </div>
     )
@@ -41,7 +41,7 @@ export function MapView({ stops }: Props) {
   let visitCount = 0
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-black/5" style={{ height: 260 }}>
+    <div className="rounded-2xl overflow-hidden border border-line-soft" style={{ height: 260 }}>
       <MapContainer bounds={bounds} boundsOptions={{ padding: [28, 28] }} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
         <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polyline positions={points} pathOptions={{ color: '#26827a', weight: 3, opacity: 0.7, dashArray: '6 6' }} />

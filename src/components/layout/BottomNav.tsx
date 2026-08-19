@@ -15,7 +15,7 @@ const TABS: Array<{ key: Tab; label: string; icon: string }> = [
 export function BottomNav({ active, onChange }: Props) {
   return (
     <nav
-      className="sticky bottom-0 left-0 right-0 bg-white border-t border-black/5 flex"
+      className="sticky bottom-0 left-0 right-0 bg-surface border-t border-line-soft flex"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {TABS.map((tab) => (
@@ -23,7 +23,7 @@ export function BottomNav({ active, onChange }: Props) {
           key={tab.key}
           onClick={() => onChange(tab.key)}
           className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 ${
-            active === tab.key ? 'text-primary-700' : 'text-[#8b9592]'
+            active === tab.key ? 'text-accent' : 'text-faint'
           }`}
         >
           <span className="text-[20px] leading-none">{tab.icon}</span>

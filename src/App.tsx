@@ -7,6 +7,7 @@ import { WeeklyPage } from './pages/WeeklyPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { usePatients } from './hooks/usePatients'
 import { useSettings } from './hooks/useSettings'
+import { useTheme } from './hooks/useTheme'
 import { todayStr } from './lib/time'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [date, setDate] = useState(todayStr())
   const patientsApi = usePatients()
   const { settings, updateSettings } = useSettings()
+  useTheme(settings.themeMode)
 
   const goToDate = (d: string) => {
     setDate(d)

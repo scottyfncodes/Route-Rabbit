@@ -35,8 +35,8 @@ export function PatientsPage({ patientsApi }: Props) {
     <div className="flex-1 flex flex-col">
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
         <div>
-          <h1 className="text-[24px] font-extrabold text-[#132825]">Patients</h1>
-          <p className="text-[13px] text-[#5c6966]">{patients.length} in your list · initials only</p>
+          <h1 className="text-[24px] font-extrabold text-ink">Patients</h1>
+          <p className="text-[13px] text-muted">{patients.length} in your list · initials only</p>
         </div>
         <button
           onClick={() => setEditing('new')}
@@ -49,10 +49,10 @@ export function PatientsPage({ patientsApi }: Props) {
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2.5">
         {sorted.length === 0 && (
-          <div className="bg-white rounded-2xl border border-black/5 px-5 py-8 text-center mt-4">
-            <p className="text-[16px] font-semibold text-[#132825] mb-1">No patients yet</p>
-            <p className="text-[14px] text-[#5c6966] mb-4">Add a patient with just their initials, address, and visit window.</p>
-            <button onClick={() => setEditing('new')} className="text-primary-700 font-bold text-[15px]">
+          <div className="bg-surface rounded-2xl border border-line-soft px-5 py-8 text-center mt-4">
+            <p className="text-[16px] font-semibold text-ink mb-1">No patients yet</p>
+            <p className="text-[14px] text-muted mb-4">Add a patient with just their initials, address, and visit window.</p>
+            <button onClick={() => setEditing('new')} className="text-accent font-bold text-[15px]">
               + Add your first patient
             </button>
           </div>
