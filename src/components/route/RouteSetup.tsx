@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from '../ui/Button'
 import { LocationInput } from './LocationInput'
 import { formatTime } from '../../lib/time'
@@ -15,18 +16,35 @@ interface Props {
 
 export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient, onBuild }: Props) {
   const selectedCount = plan.patientIds.filter((id) => availableToday.some((p) => p.id === id)).length
+  const [sameAsStart, setSameAsStart] = useState(
+    () => plan.endLocation.address === plan.startLocation.address && plan.startLocation.address !== '',
+  )
 
   return (
     <div className="px-4 pb-32 space-y-5">
       <div className="grid grid-cols-1 gap-3">
-        <LocationInput label="Start location" value={plan.startLocation} onChange={(loc) => onUpdatePlan({ startLocation: loc })} placeholder="Home address" />
-        <LocationInput label="End location" value={plan.endLocation} onChange={(loc) => onUpdatePlan({ endLocation: loc })} placeholder="Home address" />
-        <button
-          onClick={() => onUpdatePlan({ endLocation: plan.startLocation })}
-          className="text-accent text-[13px] font-semibold text-left -mt-2"
-        >
-          End where I start
-        </button>
+        <LocationInput
+          label="Start location"
+          value={plan.startLocation}
+          placeholder="Home address"
+          onChange={(loc) => onUpdatePlan(sameAsStart ? { startLocation: loc, endLocation: loc } : { startLocation: loc })}
+        />
+        <label className="flex items-center gap-2.5 py-0.5">
+          <input
+            type="checkbox"
+            checked={sameAsStart}
+            onChange={(e) => {
+              const same = e.target.checked
+              setSameAsStart(same)
+              if (same) onUpdatePlan({ endLocation: plan.startLocation })
+            }}
+            className="w-5 h-5 shrink-0 accent-primary-600"
+          />
+          <span className="text-[13.5px] font-medium text-ink">Start and end location are the same</span>
+        </label>
+        {!sameAsStart && (
+          <LocationInput label="End location" value={plan.endLocation} onChange={(loc) => onUpdatePlan({ endLocation: loc })} placeholder="Home address" />
+        )}
       </div>
 
       <div>

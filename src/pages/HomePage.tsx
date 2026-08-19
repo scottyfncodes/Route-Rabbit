@@ -54,6 +54,19 @@ export function HomePage({ settings, updateSettings, patientsApi, onNavigate }: 
             placeholder="Where your day begins"
             onChange={(loc) => updateSettings({ homeAddress: loc.address })}
           />
+          <label className="flex items-center gap-2.5 py-0.5">
+            <input
+              type="checkbox"
+              checked={!customEnd}
+              onChange={(e) => {
+                const same = e.target.checked
+                setCustomEnd(!same)
+                if (same) updateSettings({ endAddress: '' })
+              }}
+              className="w-5 h-5 shrink-0 accent-primary-600"
+            />
+            <span className="text-[13.5px] font-medium text-ink">Start and end location are the same</span>
+          </label>
           {customEnd && (
             <LocationInput
               label="End location"
@@ -62,15 +75,6 @@ export function HomePage({ settings, updateSettings, patientsApi, onNavigate }: 
               onChange={(loc) => updateSettings({ endAddress: loc.address })}
             />
           )}
-          <button
-            onClick={() => {
-              if (customEnd) updateSettings({ endAddress: '' })
-              setCustomEnd((v) => !v)
-            }}
-            className="text-[13px] font-semibold text-accent"
-          >
-            {customEnd ? 'End where I start' : '+ Use a different end location'}
-          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
