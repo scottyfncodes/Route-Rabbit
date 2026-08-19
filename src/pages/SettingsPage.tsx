@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button } from '../components/ui/Button'
+import { AddToHomeScreen } from '../components/settings/AddToHomeScreen'
 import { buildDemoPatients } from '../lib/demoData'
 import { removeStorage } from '../lib/storage'
 import type { AppSettings, ThemeMode } from '../types'
@@ -47,6 +48,8 @@ export function SettingsPage({ settings, updateSettings, patientsApi }: Props) {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6">
+        <AddToHomeScreen />
+
         <section>
           <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Appearance</h2>
           <div className="flex gap-2">
