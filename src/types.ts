@@ -9,6 +9,14 @@ export interface GeoPoint {
   lng: number
 }
 
+/** A recurring blocked window on a specific weekday -- e.g. "Tue 12:00-1:00, lunch pickup". */
+export interface PatientConflict {
+  id: string
+  day: Weekday
+  startTime: string // "HH:MM" 24h
+  endTime: string // "HH:MM" 24h
+}
+
 export interface Patient {
   id: string
   initials: string
@@ -18,6 +26,9 @@ export interface Patient {
   availableDays: Weekday[]
   windowStart: string // "HH:MM" 24h
   windowEnd: string // "HH:MM" 24h
+  /** How many of their available days actually need a visit each week. null = every available day. */
+  visitsPerWeek: number | null
+  conflicts: PatientConflict[]
   notes?: string
   status: PatientStatus
   createdAt: number

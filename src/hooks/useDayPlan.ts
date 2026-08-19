@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
-import { buildRoute } from '../lib/routing'
+import { buildRoute, selectWeeklyDays } from '../lib/routing'
 import { addDays, weekdayOf } from '../lib/time'
 import type { AppSettings, DayPlan, DayWeather, Patient } from '../types'
 
@@ -111,11 +111,16 @@ export function buildWeekRoutes(
   let daysWithConflicts = 0
   let daysBuilt = 0
 
+  // Pin each patient's actual visit days for the whole week up front, so a
+  // visitsPerWeek cap picks the same specific weekdays across every day's
+  // build rather than being re-decided (and potentially drifting) per day.
+  const weeklyDaysByPatient = new Map(patients.map((p) => [p.id, selectWeeklyDays(p)]))
+
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i)
     const weekday = weekdayOf(date)
     const existing = map[date] ?? defaultPlan(date, settings)
-    const dayPatients = patients.filter((p) => p.status === 'active' && p.availableDays.includes(weekday))
+    const dayPatients = patients.filter((p) => p.status === 'active' && (weeklyDaysByPatient.get(p.id) ?? []).includes(weekday))
     const weather = dailyWeather?.[date]
 
     const result = buildRoute({

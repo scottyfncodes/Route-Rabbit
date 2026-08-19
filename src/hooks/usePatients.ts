@@ -11,8 +11,13 @@ function newId(): string {
 
 export type NewPatientInput = Omit<Patient, 'id' | 'geo' | 'status' | 'createdAt'> & { status?: PatientStatus }
 
+/** Fills in fields added after a patient may have already been saved to storage. */
+function withDefaults(p: Partial<Patient>): Patient {
+  return { visitsPerWeek: null, conflicts: [], ...p } as Patient
+}
+
 export function usePatients() {
-  const [patients, setPatients] = useState<Patient[]>(() => readStorage<Patient[]>(KEY, []))
+  const [patients, setPatients] = useState<Patient[]>(() => readStorage<Partial<Patient>[]>(KEY, []).map(withDefaults))
 
   useEffect(() => {
     writeStorage(KEY, patients)

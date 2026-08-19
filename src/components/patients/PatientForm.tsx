@@ -1,7 +1,13 @@
 import { useState } from 'react'
-import { WEEKDAYS, type Patient, type Weekday } from '../../types'
+import { formatTime } from '../../lib/time'
+import { WEEKDAYS, type Patient, type PatientConflict, type Weekday } from '../../types'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
+const VISITS_PER_WEEK_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
+
+function newConflictId(): string {
+  return `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
 
 export interface PatientFormValues {
   initials: string
@@ -10,6 +16,8 @@ export interface PatientFormValues {
   availableDays: Weekday[]
   windowStart: string
   windowEnd: string
+  visitsPerWeek: number | null
+  conflicts: PatientConflict[]
   notes: string
 }
 
@@ -22,6 +30,8 @@ function valuesFrom(patient?: Patient): PatientFormValues {
       availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
       windowStart: '09:00',
       windowEnd: '17:00',
+      visitsPerWeek: null,
+      conflicts: [],
       notes: '',
     }
   }
@@ -32,6 +42,8 @@ function valuesFrom(patient?: Patient): PatientFormValues {
     availableDays: patient.availableDays,
     windowStart: patient.windowStart,
     windowEnd: patient.windowEnd,
+    visitsPerWeek: patient.visitsPerWeek,
+    conflicts: patient.conflicts,
     notes: patient.notes ?? '',
   }
 }
@@ -46,6 +58,9 @@ interface Props {
 export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
   const [values, setValues] = useState<PatientFormValues>(() => valuesFrom(patient))
   const [error, setError] = useState<string | null>(null)
+  const [conflictDay, setConflictDay] = useState<Weekday>('Mon')
+  const [conflictStart, setConflictStart] = useState('12:00')
+  const [conflictEnd, setConflictEnd] = useState('13:00')
 
   const set = <K extends keyof PatientFormValues>(key: K, val: PatientFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: val }))
@@ -53,6 +68,14 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
   const toggleDay = (day: Weekday) => {
     set('availableDays', values.availableDays.includes(day) ? values.availableDays.filter((d) => d !== day) : [...values.availableDays, day])
   }
+
+  const addConflict = () => {
+    if (conflictStart >= conflictEnd) return setError('Conflict end time must be after start time.')
+    setError(null)
+    set('conflicts', [...values.conflicts, { id: newConflictId(), day: conflictDay, startTime: conflictStart, endTime: conflictEnd }])
+  }
+
+  const removeConflict = (id: string) => set('conflicts', values.conflicts.filter((c) => c.id !== id))
 
   const handleSubmit = () => {
     const initials = values.initials.trim().toUpperCase()
@@ -136,6 +159,26 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
           </div>
         </div>
 
+        <div>
+          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Visits needed per week</label>
+          <div className="flex gap-1.5 flex-wrap">
+            {VISITS_PER_WEEK_OPTIONS.map((n) => (
+              <button
+                key={n ?? 'any'}
+                onClick={() => set('visitsPerWeek', n)}
+                className={`px-4 py-2.5 rounded-xl font-semibold text-[14px] border-2 ${
+                  values.visitsPerWeek === n ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
+                }`}
+              >
+                {n === null ? 'Any' : `${n}×`}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-subtle mt-1.5">
+            If fewer than their available days, Build My Week automatically picks which specific days to see them.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Window start</label>
@@ -155,6 +198,57 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
               className="w-full text-[16px] bg-surface rounded-2xl border border-line px-3 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Conflicts (blocked times)</label>
+          {values.conflicts.length > 0 && (
+            <div className="space-y-2 mb-2.5">
+              {values.conflicts.map((c) => (
+                <div key={c.id} className="flex items-center justify-between bg-surface rounded-xl border border-line-soft px-3.5 py-2.5">
+                  <span className="text-[14px] font-medium text-ink">
+                    {c.day} · {formatTime(c.startTime)}–{formatTime(c.endTime)}
+                  </span>
+                  <button onClick={() => removeConflict(c.id)} className="text-danger text-[13px] font-bold px-1">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="bg-surface rounded-2xl border border-line-soft px-3 py-3 space-y-2.5">
+            <select
+              value={conflictDay}
+              onChange={(e) => setConflictDay(e.target.value as Weekday)}
+              className="w-full bg-app rounded-xl border border-line px-3 py-2.5 text-[14px] text-ink"
+            >
+              {WEEKDAYS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="time"
+                value={conflictStart}
+                onChange={(e) => setConflictStart(e.target.value)}
+                className="w-full bg-app rounded-xl border border-line px-2 py-2.5 text-[14px] text-ink"
+              />
+              <input
+                type="time"
+                value={conflictEnd}
+                onChange={(e) => setConflictEnd(e.target.value)}
+                className="w-full bg-app rounded-xl border border-line px-2 py-2.5 text-[14px] text-ink"
+              />
+            </div>
+            <button onClick={addConflict} className="w-full py-2.5 rounded-xl bg-primary-600 text-white font-bold text-[13.5px]">
+              + Add conflict
+            </button>
+          </div>
+          <p className="text-[12px] text-subtle mt-1.5">
+            e.g. Tue 12:00–1:00 for a recurring lunch pickup. The route works around these automatically.
+          </p>
         </div>
 
         <div>

@@ -1,4 +1,5 @@
-import type { BuiltRoute, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, WeatherImpact } from '../types'
+import type { BuiltRoute, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, Weekday, WeatherImpact } from '../types'
+import { WEEKDAYS } from '../types'
 import { estimateLeg } from './distance'
 import { buildDirectionsUrl } from './googleMaps'
 import { fromMinutes, toMinutes, weekdayOf } from './time'
@@ -19,6 +20,82 @@ export interface RoutingInput {
 
 const OPEN_BLOCK_THRESHOLD_MINUTES = 15
 
+interface Interval {
+  start: number
+  end: number
+}
+
+/** Subtracts a patient's conflict windows (for one weekday) out of their overall availability window. */
+function freeIntervals(windowStart: number, windowEnd: number, blockedIntervals: Interval[]): Interval[] {
+  const blocks = blockedIntervals
+    .map((b) => ({ start: Math.max(windowStart, b.start), end: Math.min(windowEnd, b.end) }))
+    .filter((b) => b.start < b.end)
+    .sort((a, b) => a.start - b.start)
+
+  const free: Interval[] = []
+  let cursor = windowStart
+  for (const block of blocks) {
+    if (block.start > cursor) free.push({ start: cursor, end: block.start })
+    cursor = Math.max(cursor, block.end)
+  }
+  if (cursor < windowEnd) free.push({ start: cursor, end: windowEnd })
+  return free
+}
+
+/** Earliest moment at/after `arrival` where a visit of `duration` fits within a free interval. */
+function earliestSlot(free: Interval[], arrival: number, duration: number): number | null {
+  for (const interval of free) {
+    const start = Math.max(arrival, interval.start)
+    if (start + duration <= interval.end) return start
+  }
+  return null
+}
+
+function conflictIntervalsFor(patient: Patient, weekday: Weekday): Interval[] {
+  return patient.conflicts
+    .filter((c) => c.day === weekday)
+    .map((c) => ({ start: toMinutes(c.startTime), end: toMinutes(c.endTime) }))
+}
+
+/** Where (if anywhere) this patient could start a visit today, respecting their window and any conflicts. */
+function findVisitSlot(patient: Patient, weekday: Weekday, arrival: number): number | null {
+  const windowStart = toMinutes(patient.windowStart)
+  const windowEnd = toMinutes(patient.windowEnd)
+  const free = freeIntervals(windowStart, windowEnd, conflictIntervalsFor(patient, weekday))
+  return earliestSlot(free, arrival, patient.visitDuration)
+}
+
+/**
+ * Picks which of a patient's available days actually get a visit each week, for
+ * patients seen less often than they're available (e.g. available Mon/Wed/Fri but
+ * only needs 2x/week). Spreads the chosen days evenly across their available set so
+ * the same specific weekdays are picked every week -- a predictable routine rather
+ * than whatever happens to be most efficient that particular week.
+ */
+export function selectWeeklyDays(patient: Patient): Weekday[] {
+  const available = WEEKDAYS.filter((d) => patient.availableDays.includes(d))
+  const need = patient.visitsPerWeek
+  if (!need || need >= available.length) return available
+  if (need <= 0) return []
+
+  const chosen = new Set<Weekday>()
+  if (need === 1) {
+    chosen.add(available[Math.floor((available.length - 1) / 2)])
+  } else {
+    for (let i = 0; i < need; i++) {
+      const idx = Math.round((i * (available.length - 1)) / (need - 1))
+      chosen.add(available[idx])
+    }
+  }
+  // rounding can collide on small lists; backfill from the remaining available days if short
+  for (const d of available) {
+    if (chosen.size >= need) break
+    chosen.add(d)
+  }
+
+  return WEEKDAYS.filter((d) => chosen.has(d))
+}
+
 interface ScheduledVisit {
   patient: Patient
   arrive: number
@@ -33,6 +110,7 @@ function simulateOrder(
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
   avgSpeedMph: number,
+  weekday: Weekday,
 ): { visits: ScheduledVisit[]; feasible: boolean; totalDriveMinutes: number; finishMinutes: number } {
   let currentTime = dayStartMinutes
   let currentGeo = start.geo
@@ -49,11 +127,10 @@ function simulateOrder(
       driveMiles = leg.miles
     }
     const arrive = currentTime + driveMinutes
-    const windowStart = toMinutes(patient.windowStart)
-    const windowEnd = toMinutes(patient.windowEnd)
-    const actualStart = Math.max(arrive, windowStart)
+    const slot = findVisitSlot(patient, weekday, arrive)
+    const actualStart = slot ?? arrive
     const depart = actualStart + patient.visitDuration
-    if (depart > windowEnd) feasible = false
+    if (slot === null) feasible = false
 
     visits.push({ patient, arrive: actualStart, depart, driveMinutes, driveMiles })
     totalDriveMinutes += driveMinutes
@@ -64,12 +141,13 @@ function simulateOrder(
   return { visits, feasible, totalDriveMinutes, finishMinutes: currentTime }
 }
 
-/** Greedy nearest/most-urgent construction, respecting hard availability windows. */
+/** Greedy nearest/most-urgent construction, respecting hard availability windows and conflicts. */
 function greedyConstruct(
   candidates: Patient[],
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
   avgSpeedMph: number,
+  weekday: Weekday,
 ): { order: Patient[]; unscheduled: Patient[] } {
   const remaining = [...candidates]
   const order: Patient[] = []
@@ -83,13 +161,11 @@ function greedyConstruct(
     remaining.forEach((patient, idx) => {
       const leg = currentGeo && patient.geo ? estimateLeg(currentGeo, patient.geo, avgSpeedMph) : { minutes: 0, miles: 0 }
       const arrive = currentTime + leg.minutes
-      const windowStart = toMinutes(patient.windowStart)
-      const windowEnd = toMinutes(patient.windowEnd)
-      const actualStart = Math.max(arrive, windowStart)
-      const feasible = actualStart + patient.visitDuration <= windowEnd
-      if (!feasible) return
+      const actualStart = findVisitSlot(patient, weekday, arrive)
+      if (actualStart === null) return
 
-      const waitMinutes = Math.max(0, windowStart - arrive)
+      const windowEnd = toMinutes(patient.windowEnd)
+      const waitMinutes = actualStart - arrive
       const slackMinutes = windowEnd - actualStart
       // Prefer nearby + low-wait candidates, with a mild tie-break toward tighter deadlines.
       const score = leg.minutes + waitMinutes * 0.75 + slackMinutes * 0.05
@@ -104,7 +180,7 @@ function greedyConstruct(
     const [chosen] = remaining.splice(bestIdx, 1)
     const leg = currentGeo && chosen.geo ? estimateLeg(currentGeo, chosen.geo, avgSpeedMph) : { minutes: 0, miles: 0 }
     const arrive = currentTime + leg.minutes
-    const actualStart = Math.max(arrive, toMinutes(chosen.windowStart))
+    const actualStart = findVisitSlot(chosen, weekday, arrive) ?? arrive
     currentTime = actualStart + chosen.visitDuration
     currentGeo = chosen.geo ?? currentGeo
     order.push(chosen)
@@ -128,9 +204,10 @@ function twoOptImprove(
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
   avgSpeedMph: number,
+  weekday: Weekday,
 ): Patient[] {
   let best = order
-  let bestResult = simulateOrder(best, start, dayStartMinutes, avgSpeedMph)
+  let bestResult = simulateOrder(best, start, dayStartMinutes, avgSpeedMph, weekday)
   if (!bestResult.feasible) return best
 
   let improved = true
@@ -143,7 +220,7 @@ function twoOptImprove(
       for (let j = i + 1; j < best.length; j++) {
         iterations++
         const candidate = [...best.slice(0, i), ...best.slice(i, j + 1).reverse(), ...best.slice(j + 1)]
-        const result = simulateOrder(candidate, start, dayStartMinutes, avgSpeedMph)
+        const result = simulateOrder(candidate, start, dayStartMinutes, avgSpeedMph, weekday)
         if (result.feasible && scheduleScore(result) < scheduleScore(bestResult) - 0.01) {
           best = candidate
           bestResult = result
@@ -224,16 +301,19 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     eligible.push(patient)
   }
 
-  const { order: constructed, unscheduled } = greedyConstruct(eligible, startLocation, dayStartMinutes, avgSpeedMph)
+  const { order: constructed, unscheduled } = greedyConstruct(eligible, startLocation, dayStartMinutes, avgSpeedMph, weekday)
   for (const patient of unscheduled) {
+    const hasConflictsToday = patient.conflicts.some((c) => c.day === weekday)
     conflicts.push({
       patientId: patient.id,
-      message: `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd}. The current route can't fit them in — try adjusting the day's start time or another patient's window.`,
+      message: hasConflictsToday
+        ? `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd} on ${weekday}, minus their blocked times. The current route can't fit them in.`
+        : `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd}. The current route can't fit them in — try adjusting the day's start time or another patient's window.`,
     })
   }
 
-  const optimizedOrder = twoOptImprove(constructed, startLocation, dayStartMinutes, avgSpeedMph)
-  const { visits } = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, avgSpeedMph)
+  const optimizedOrder = twoOptImprove(constructed, startLocation, dayStartMinutes, avgSpeedMph, weekday)
+  const { visits } = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, avgSpeedMph, weekday)
 
   const lunchPlacement = findLunchPlacement(visits, lunch, dayStartMinutes)
   if (lunch.enabled && !lunchPlacement) {

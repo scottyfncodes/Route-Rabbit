@@ -1,4 +1,4 @@
-import type { Patient, Weekday } from '../types'
+import type { Patient, PatientConflict, Weekday } from '../types'
 
 const WEEKDAYS_MF: Weekday[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
@@ -8,19 +8,30 @@ function id(): string {
   return `demo-${Date.now()}-${seq}`
 }
 
+function conflict(day: Weekday, startTime: string, endTime: string): PatientConflict {
+  return { id: id(), day, startTime, endTime }
+}
+
+type DemoInput = Omit<Patient, 'geo' | 'status' | 'createdAt' | 'id' | 'visitsPerWeek' | 'conflicts'> &
+  Partial<Pick<Patient, 'visitsPerWeek' | 'conflicts'>>
+
 /**
  * Fictional demo patients with fictional addresses, tuned to demonstrate a
- * normal route, a tight/likely-conflicting window, and a full day's worth of
- * material for exercising cancellation + rebuild.
+ * normal route, a tight/likely-conflicting window, a visits-per-week cap that
+ * needs the algorithm to pick specific days, a recurring blocked-time
+ * conflict, and a full day's worth of material for exercising cancellation +
+ * rebuild.
  */
 export function buildDemoPatients(): Patient[] {
   const now = Date.now()
-  const make = (p: Omit<Patient, 'geo' | 'status' | 'createdAt' | 'id'>): Patient => ({
+  const make = (p: DemoInput): Patient => ({
     ...p,
     id: id(),
     geo: null,
     status: 'active',
     createdAt: now,
+    visitsPerWeek: p.visitsPerWeek ?? null,
+    conflicts: p.conflicts ?? [],
   })
 
   return [
@@ -41,6 +52,7 @@ export function buildDemoPatients(): Patient[] {
       windowStart: '08:30',
       windowEnd: '10:30',
       notes: 'Must finish before 10:30am pickup',
+      visitsPerWeek: 2, // available 3 days/week but only needs 2 -- algorithm should pick Mon + Fri
     }),
     make({
       initials: 'MK',
@@ -49,6 +61,7 @@ export function buildDemoPatients(): Patient[] {
       availableDays: WEEKDAYS_MF,
       windowStart: '09:00',
       windowEnd: '16:00',
+      conflicts: [conflict('Tue', '12:00', '13:00')], // recurring lunch pickup
     }),
     make({
       initials: 'TR',
