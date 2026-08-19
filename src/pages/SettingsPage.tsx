@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { AddToHomeScreen } from '../components/settings/AddToHomeScreen'
-import { buildDemoPatients } from '../lib/demoData'
 import { removeStorage } from '../lib/storage'
 import type { AppSettings, ThemeMode } from '../types'
-import type { usePatients } from '../hooks/usePatients'
 
 const SPEED_PRESETS: Array<{ label: string; value: number }> = [
   { label: 'Dense city', value: 18 },
@@ -21,17 +19,10 @@ const THEME_PRESETS: Array<{ label: string; value: ThemeMode; icon: string }> = 
 interface Props {
   settings: AppSettings
   updateSettings: (changes: Partial<AppSettings>) => void
-  patientsApi: ReturnType<typeof usePatients>
 }
 
-export function SettingsPage({ settings, updateSettings, patientsApi }: Props) {
-  const [demoLoaded, setDemoLoaded] = useState(false)
+export function SettingsPage({ settings, updateSettings }: Props) {
   const [confirmingReset, setConfirmingReset] = useState(false)
-
-  const handleLoadDemo = () => {
-    patientsApi.importDemoPatients(buildDemoPatients())
-    setDemoLoaded(true)
-  }
 
   const handleReset = () => {
     removeStorage('patients')
@@ -99,19 +90,6 @@ export function SettingsPage({ settings, updateSettings, patientsApi }: Props) {
             are looked up via a free map service, and your start location's coordinates are sent to a free weather service --
             neither ever receives patient initials or any other identifying information.
           </p>
-        </section>
-
-        <section>
-          <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Demo data</h2>
-          <div className="bg-surface rounded-2xl border border-line-soft px-4 py-4">
-            <p className="text-[13.5px] text-muted mb-3">
-              Load six fictional patients (AB, JS, MK, TR, LM, CD) with fake addresses to try building a route, hitting a
-              schedule conflict, cancelling a visit, and rebuilding.
-            </p>
-            <Button variant="secondary" fullWidth onClick={handleLoadDemo} disabled={demoLoaded}>
-              {demoLoaded ? '✓ Demo day loaded' : 'Load Demo Day'}
-            </Button>
-          </div>
         </section>
 
         <section>

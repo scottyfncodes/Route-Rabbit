@@ -68,18 +68,9 @@ export function usePatients() {
     setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)))
   }, [])
 
-  const importDemoPatients = useCallback((demo: Patient[]) => {
-    setPatients((prev) => {
-      const existingInitials = new Set(prev.map((p) => p.initials))
-      const merged = [...prev, ...demo.filter((d) => !existingInitials.has(d.initials))]
-      return merged
-    })
-    demo.forEach((d) => geocodeInBackground(d.id, d.address))
-  }, [geocodeInBackground])
-
   const regeocodeMissing = useCallback(() => {
     patients.filter((p) => !p.geo).forEach((p) => geocodeInBackground(p.id, p.address))
   }, [patients, geocodeInBackground])
 
-  return { patients, addPatient, updatePatient, removePatient, setStatus, importDemoPatients, regeocodeMissing }
+  return { patients, addPatient, updatePatient, removePatient, setStatus, regeocodeMissing }
 }

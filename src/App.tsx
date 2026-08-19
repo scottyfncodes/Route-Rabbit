@@ -42,7 +42,7 @@ export default function App() {
           )}
           {tab === 'patients' && <PatientsPage patientsApi={patientsApi} />}
           {tab === 'weekly' && <WeeklyPage onSelectDate={setDayView} patientsApi={patientsApi} settings={settings} />}
-          {tab === 'settings' && <SettingsPage settings={settings} updateSettings={updateSettings} patientsApi={patientsApi} />}
+          {tab === 'settings' && <SettingsPage settings={settings} updateSettings={updateSettings} />}
         </>
       )}
 

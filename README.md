@@ -58,9 +58,9 @@ npm install
 npm run dev
 ```
 
-Open the app, dismiss the privacy notice, and use **Settings -> Load Demo Day**
-to try it with six fictional patients (including one with a tight, likely-
-conflicting time window) without entering any real data.
+Open the app, dismiss the privacy notice, set a start location on the Home
+tab, then add patients (initials, address, duration, available days/window)
+on the Patients tab before building a route.
 
 ## Project structure
 
