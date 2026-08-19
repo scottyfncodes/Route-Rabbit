@@ -8,14 +8,15 @@ interface Props {
   patientsApi: ReturnType<typeof usePatients>
 }
 
+const byInitials = (a: Patient, b: Patient) => a.initials.localeCompare(b.initials)
+
 export function PatientsPage({ patientsApi }: Props) {
   const { patients, addPatient, updatePatient, removePatient, setStatus } = patientsApi
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
+  const [archiveOpen, setArchiveOpen] = useState(false)
 
-  const sorted = [...patients].sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'active' ? -1 : 1
-    return a.initials.localeCompare(b.initials)
-  })
+  const active = patients.filter((p) => p.status === 'active').sort(byInitials)
+  const archived = patients.filter((p) => p.status === 'inactive').sort(byInitials)
 
   const handleSave = (values: PatientFormValues) => {
     if (editing && editing !== 'new') {
@@ -48,7 +49,7 @@ export function PatientsPage({ patientsApi }: Props) {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2.5">
-        {sorted.length === 0 && (
+        {patients.length === 0 && (
           <div className="bg-surface rounded-2xl border border-line-soft px-5 py-8 text-center mt-4">
             <p className="text-[16px] font-semibold text-ink mb-1">No patients yet</p>
             <p className="text-[14px] text-muted mb-4">Add a patient with just their initials, address, and visit window.</p>
@@ -57,14 +58,46 @@ export function PatientsPage({ patientsApi }: Props) {
             </button>
           </div>
         )}
-        {sorted.map((p) => (
+
+        {active.map((p) => (
           <PatientCard
             key={p.id}
             patient={p}
             onEdit={() => setEditing(p)}
-            onToggleStatus={() => setStatus(p.id, p.status === 'active' ? 'inactive' : 'active')}
+            onToggleStatus={() => {
+              setStatus(p.id, 'inactive')
+              setArchiveOpen(true)
+            }}
           />
         ))}
+
+        {active.length === 0 && archived.length > 0 && (
+          <p className="text-[14px] text-muted text-center py-6">All patients are archived.</p>
+        )}
+
+        {archived.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => setArchiveOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-1 py-2 text-left"
+            >
+              <span className="text-[13px] font-bold text-label uppercase tracking-wide">🗄️ Archive ({archived.length})</span>
+              <span className={`text-[14px] text-faint transition-transform ${archiveOpen ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+            {archiveOpen && (
+              <div className="space-y-2.5 mt-1">
+                {archived.map((p) => (
+                  <PatientCard
+                    key={p.id}
+                    patient={p}
+                    onEdit={() => setEditing(p)}
+                    onToggleStatus={() => setStatus(p.id, 'active')}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {editing && (

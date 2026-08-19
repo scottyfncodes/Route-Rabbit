@@ -34,7 +34,7 @@ export function PatientCard({ patient, onEdit, onToggleStatus }: Props) {
         onClick={onToggleStatus}
         className={`w-20 shrink-0 text-[12px] font-bold border-l border-line-soft ${inactive ? 'text-subtle bg-app' : 'text-accent bg-mint-50'}`}
       >
-        {inactive ? 'Inactive' : 'Active'}
+        {inactive ? 'Archived' : 'Active'}
       </button>
     </div>
   )
