@@ -17,6 +17,7 @@ export function PatientsPage({ patientsApi }: Props) {
 
   const active = patients.filter((p) => p.status === 'active').sort(byInitials)
   const archived = patients.filter((p) => p.status === 'inactive').sort(byInitials)
+  const archiveIsFolder = archived.length > 1
 
   const handleSave = (values: PatientFormValues) => {
     if (editing && editing !== 'new') {
@@ -30,6 +31,11 @@ export function PatientsPage({ patientsApi }: Props) {
   const handleDelete = () => {
     if (editing && editing !== 'new') removePatient(editing.id)
     setEditing(null)
+  }
+
+  const archivePatient = (id: string) => {
+    setStatus(id, 'inactive')
+    setArchiveOpen(true)
   }
 
   return (
@@ -60,43 +66,37 @@ export function PatientsPage({ patientsApi }: Props) {
         )}
 
         {active.map((p) => (
-          <PatientCard
-            key={p.id}
-            patient={p}
-            onEdit={() => setEditing(p)}
-            onToggleStatus={() => {
-              setStatus(p.id, 'inactive')
-              setArchiveOpen(true)
-            }}
-          />
+          <PatientCard key={p.id} patient={p} onEdit={() => setEditing(p)} onToggleStatus={() => archivePatient(p.id)} />
         ))}
 
         {active.length === 0 && archived.length > 0 && (
           <p className="text-[14px] text-muted text-center py-6">All patients are archived.</p>
         )}
 
-        {archived.length > 0 && (
-          <div className="pt-2">
+        {/* A single archived patient just sits in the list like any other card -- no folder needed for one. */}
+        {archived.length === 1 && (
+          <PatientCard patient={archived[0]} onEdit={() => setEditing(archived[0])} onToggleStatus={() => setStatus(archived[0].id, 'active')} />
+        )}
+
+        {/* Once more than one patient is archived, they collapse into a single folder card in the same spot. */}
+        {archiveIsFolder && (
+          <>
             <button
               onClick={() => setArchiveOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-1 py-2 text-left"
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-line-soft bg-surface opacity-70 text-left"
             >
-              <span className="text-[13px] font-bold text-label uppercase tracking-wide">🗄️ Archive ({archived.length})</span>
-              <span className={`text-[14px] text-faint transition-transform ${archiveOpen ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-            {archiveOpen && (
-              <div className="space-y-2.5 mt-1">
-                {archived.map((p) => (
-                  <PatientCard
-                    key={p.id}
-                    patient={p}
-                    onEdit={() => setEditing(p)}
-                    onToggleStatus={() => setStatus(p.id, 'active')}
-                  />
-                ))}
+              <div className="w-12 h-12 shrink-0 rounded-full bg-app text-subtle text-[20px] flex items-center justify-center">📁</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-[16px] text-ink">Archive</div>
+                <div className="text-[13px] text-muted">{archived.length} patients</div>
               </div>
-            )}
-          </div>
+              <span className={`text-[16px] text-faint transition-transform ${archiveOpen ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+            {archiveOpen &&
+              archived.map((p) => (
+                <PatientCard key={p.id} patient={p} onEdit={() => setEditing(p)} onToggleStatus={() => setStatus(p.id, 'active')} />
+              ))}
+          </>
         )}
       </div>
 
