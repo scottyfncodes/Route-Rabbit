@@ -16,7 +16,9 @@ change mid-day.
 
 - **Patients by initials only.** No names, DOB, diagnoses, insurance, or other PHI --
   just initials, address, visit duration, available days, a time window, an
-  optional visits-per-week target, and recurring blocked-time conflicts.
+  optional visits-per-week target, recurring blocked-time conflicts, a scheduling
+  priority (High/Medium/Low, shown as a small colored dot), and whether they're
+  available to fill make-up slots.
 - **Build My Week.** One tap builds an optimized route for every day of the
   week from each active patient's own available days -- or build/rebuild a
   single day from its overview screen. A patient seen fewer times than
@@ -29,6 +31,13 @@ change mid-day.
   overview.
 - **Rebuild Route.** Cancel a visit mid-day and rebuild in seconds -- new order,
   new times, new drive estimate, with the time saved shown clearly.
+- **Cancellation + make-up visits.** Cancelling a visit walks you through finding a
+  replacement: ranked make-up candidates (High/Medium/Low scheduling priority first,
+  then least added drive time) who are marked available for make-up visits, fit the
+  vacated window, and aren't already on the day's route -- or just leave the slot
+  open. Cancelling never deletes the patient or changes their active/discharged
+  status; a chosen replacement becomes a real, persisted stop on the route (labeled
+  "Make-up"), even on a day they aren't normally scheduled.
 - **Open in Google Maps.** One tap opens a multi-stop driving-directions link with
   the optimized stop order. Navigation itself always happens in Google Maps.
 - **Context-aware Coffee / Lunch / Parks.** Search nearby places around wherever

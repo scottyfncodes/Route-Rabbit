@@ -19,11 +19,17 @@ function defaultPlan(date: string, settings: AppSettings): DayPlan {
     endLocation: end,
     patientIds: [],
     cancelledPatientIds: [],
+    makeupPatientIds: [],
     lunch: { enabled: true, earliest: '11:30', latest: '13:30', duration: 30 },
     currentLocationOverride: null,
     activeStopId: null,
     result: null,
   }
+}
+
+/** Fills in fields added after a plan may have already been saved to storage (e.g. an older day plan with no makeupPatientIds yet). */
+function withPlanDefaults(date: string, settings: AppSettings, stored?: Partial<DayPlan>): DayPlan {
+  return { ...defaultPlan(date, settings), ...stored }
 }
 
 export function useDayPlan(date: string, settings: AppSettings) {
@@ -33,12 +39,12 @@ export function useDayPlan(date: string, settings: AppSettings) {
     writeStorage(KEY, plans)
   }, [plans])
 
-  const plan = plans[date] ?? defaultPlan(date, settings)
+  const plan = withPlanDefaults(date, settings, plans[date])
 
   const updatePlan = useCallback(
     (changes: Partial<DayPlan> | ((prev: DayPlan) => Partial<DayPlan>)) => {
       setPlans((prev) => {
-        const current = prev[date] ?? defaultPlan(date, settings)
+        const current = withPlanDefaults(date, settings, prev[date])
         const delta = typeof changes === 'function' ? changes(current) : changes
         return { ...prev, [date]: { ...current, ...delta } }
       })
@@ -53,6 +59,7 @@ export function useDayPlan(date: string, settings: AppSettings) {
         return {
           patientIds: has ? prev.patientIds.filter((id) => id !== patientId) : [...prev.patientIds, patientId],
           cancelledPatientIds: prev.cancelledPatientIds.filter((id) => id !== patientId),
+          makeupPatientIds: prev.makeupPatientIds.filter((id) => id !== patientId),
         }
       })
     },
@@ -139,6 +146,7 @@ export function buildWeekRoutes(
       ...existing,
       patientIds: dayPatients.map((p) => p.id),
       cancelledPatientIds: [],
+      makeupPatientIds: [],
       activeStopId: null,
       currentLocationOverride: null,
       result,

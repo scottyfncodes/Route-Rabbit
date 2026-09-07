@@ -13,11 +13,12 @@ interface Props {
   stops: Stop[]
   patientsById: Map<string, Patient>
   activeStopId: string | null
+  makeupPatientIds?: string[]
   onImHere: (stop: Stop) => void
   onCancelPatient: (patientId: string) => void
 }
 
-export function Timeline({ stops, patientsById, activeStopId, onImHere, onCancelPatient }: Props) {
+export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds = [], onImHere, onCancelPatient }: Props) {
   return (
     <div className="space-y-0">
       {stops.map((stop, idx) => {
@@ -48,6 +49,9 @@ export function Timeline({ stops, patientsById, activeStopId, onImHere, onCancel
                   <span className="font-semibold text-[15px] text-ink truncate">
                     {isVisit ? patient?.initials ?? stop.label : stop.label}
                   </span>
+                  {isVisit && stop.patientId && makeupPatientIds.includes(stop.patientId) && (
+                    <span className="text-[11px] font-bold text-accent bg-mint-50 rounded-full px-2 py-0.5 shrink-0">Make-up</span>
+                  )}
                 </div>
                 {isVisit && patient?.notes && <div className="text-[12.5px] text-subtle italic truncate">{patient.notes}</div>}
                 {isVisit && patient?.address && <div className="text-[12.5px] text-muted truncate">{patient.address}</div>}

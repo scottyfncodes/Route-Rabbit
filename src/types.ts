@@ -4,6 +4,9 @@ export const WEEKDAYS: Weekday[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'S
 
 export type PatientStatus = 'active' | 'inactive'
 
+/** Administrative scheduling preference the PT sets explicitly -- not a clinical severity score. */
+export type PatientPriority = 'high' | 'medium' | 'low'
+
 export interface GeoPoint {
   lat: number
   lng: number
@@ -31,6 +34,10 @@ export interface Patient {
   conflicts: PatientConflict[]
   notes?: string
   status: PatientStatus
+  /** Scheduling priority for deciding who to call first when a make-up slot opens up. */
+  priority: PatientPriority
+  /** Whether this patient can currently fill an opening from someone else's cancellation -- independent of their regular visit schedule. */
+  makeupAvailable: boolean
   createdAt: number
 }
 
@@ -55,6 +62,7 @@ export interface DayPlan {
   endLocation: NamedLocation
   patientIds: string[] // selected for the day, unordered "wishlist"
   cancelledPatientIds: string[] // cancelled for today only, kept for history/undo
+  makeupPatientIds: string[] // added today to fill a cancellation, even if today isn't one of their regular available days
   lunch: LunchPreference
   currentLocationOverride: NamedLocation | null
   activeStopId: string | null

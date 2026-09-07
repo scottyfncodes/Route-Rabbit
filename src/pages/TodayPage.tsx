@@ -7,9 +7,11 @@ import { ConflictBanner } from '../components/route/ConflictBanner'
 import { MapView } from '../components/route/MapView'
 import { QuickActions } from '../components/route/QuickActions'
 import { NextStopCard } from '../components/route/NextStopCard'
+import { CancelVisitModal } from '../components/route/CancelVisitModal'
 import { useDayPlan } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
 import { buildRoute } from '../lib/routing'
+import { findMakeupCandidates } from '../lib/makeup'
 import { addDays, formatDateHeading, formatDuration, todayStr, weekdayOf } from '../lib/time'
 import type { AppSettings, BuiltRoute, Patient } from '../types'
 import type { usePatients } from '../hooks/usePatients'
@@ -34,6 +36,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   const { forecast: weather } = useWeather(settings.homeGeo)
   const [showSetup, setShowSetup] = useState(!plan.result)
   const [delta, setDelta] = useState<Delta | null>(null)
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null)
 
   const weekday = weekdayOf(date)
   const patientsById = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
@@ -43,8 +46,8 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   )
   const cancelledToday = plan.cancelledPatientIds.map((id) => patientsById.get(id)).filter((p): p is Patient => Boolean(p))
 
-  const computeResult = (cancelledIds: string[]): BuiltRoute => {
-    const dayPatients = plan.patientIds
+  const computeResult = (cancelledIds: string[], patientIds: string[] = plan.patientIds, makeupIds: string[] = plan.makeupPatientIds): BuiltRoute => {
+    const dayPatients = patientIds
       .filter((id) => !cancelledIds.includes(id))
       .map((id) => patientsById.get(id))
       .filter((p): p is Patient => Boolean(p))
@@ -61,6 +64,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
       avgSpeedMph: settings.avgSpeedMph,
       weatherImpact: dayWeather?.impact,
       weatherLabel: dayWeather?.label,
+      makeupPatientIds: makeupIds,
     })
   }
 
@@ -89,11 +93,33 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   const handleRebuild = () => rebuildWithCancelled(plan.cancelledPatientIds)
   const handleCancelPatient = (patientId: string) => {
     if (plan.cancelledPatientIds.includes(patientId)) return
-    rebuildWithCancelled([...plan.cancelledPatientIds, patientId])
+    setCancelTargetId(patientId)
   }
   const handleRestorePatient = (patientId: string) => {
     restorePatientToday(patientId)
     rebuildWithCancelled(plan.cancelledPatientIds.filter((id) => id !== patientId))
+  }
+
+  const handleLeaveSlotOpen = (patientId: string) => {
+    rebuildWithCancelled([...plan.cancelledPatientIds, patientId])
+    setCancelTargetId(null)
+  }
+
+  const handleAddMakeup = (cancelledId: string, makeupId: string) => {
+    const prevResult = plan.result
+    const newCancelled = plan.cancelledPatientIds.includes(cancelledId) ? plan.cancelledPatientIds : [...plan.cancelledPatientIds, cancelledId]
+    const newPatientIds = plan.patientIds.includes(makeupId) ? plan.patientIds : [...plan.patientIds, makeupId]
+    const newMakeupIds = plan.makeupPatientIds.includes(makeupId) ? plan.makeupPatientIds : [...plan.makeupPatientIds, makeupId]
+    const result = computeResult(newCancelled, newPatientIds, newMakeupIds)
+    updatePlan({ cancelledPatientIds: newCancelled, patientIds: newPatientIds, makeupPatientIds: newMakeupIds, result })
+    if (prevResult) {
+      setDelta({
+        driveMinutesSaved: prevResult.totalDriveMinutes - result.totalDriveMinutes,
+        prevOrder: orderLabel(prevResult),
+        newOrder: orderLabel(result),
+      })
+    }
+    setCancelTargetId(null)
   }
 
   const handleImHere = (stopId: string) => {
@@ -108,6 +134,23 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   const currentLocation = plan.currentLocationOverride ?? plan.startLocation
 
   const canGoNext = date < addDays(todayStr(), 90)
+
+  const cancelTargetPatient = cancelTargetId ? patientsById.get(cancelTargetId) : undefined
+  const cancelTargetStop = cancelTargetId ? stops.find((s) => s.patientId === cancelTargetId) : undefined
+  const makeupCandidates =
+    cancelTargetPatient && cancelTargetStop
+      ? findMakeupCandidates({
+          cancelledPatientId: cancelTargetPatient.id,
+          weekday,
+          slotStart: cancelTargetStop.arrive,
+          slotEnd: cancelTargetStop.depart,
+          allPatients: patients,
+          scheduledPatientIdsToday: plan.patientIds.filter((id) => !plan.cancelledPatientIds.includes(id) && id !== cancelTargetPatient.id),
+          prevStopGeo: stops[stops.indexOf(cancelTargetStop) - 1]?.geo ?? null,
+          nextStopGeo: stops[stops.indexOf(cancelTargetStop) + 1]?.geo ?? null,
+          avgSpeedMph: settings.avgSpeedMph,
+        })
+      : []
 
   return (
     <div className="flex-1 flex flex-col">
@@ -215,6 +258,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
                 stops={stops}
                 patientsById={patientsById}
                 activeStopId={plan.activeStopId}
+                makeupPatientIds={plan.makeupPatientIds}
                 onImHere={(stop) => handleImHere(stop.id)}
                 onCancelPatient={handleCancelPatient}
               />
@@ -238,6 +282,17 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
           </div>
         )}
       </div>
+
+      {cancelTargetPatient && cancelTargetStop && (
+        <CancelVisitModal
+          patient={cancelTargetPatient}
+          stop={cancelTargetStop}
+          candidates={makeupCandidates}
+          onAddCandidate={(makeupId) => handleAddMakeup(cancelTargetPatient.id, makeupId)}
+          onLeaveOpen={() => handleLeaveSlotOpen(cancelTargetPatient.id)}
+          onDismiss={() => setCancelTargetId(null)}
+        />
+      )}
     </div>
   )
 }

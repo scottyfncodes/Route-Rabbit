@@ -1,5 +1,8 @@
-import type { Patient } from '../../types'
+import type { Patient, PatientPriority } from '../../types'
 import { formatDays, formatTime } from '../../lib/time'
+
+const PRIORITY_DOT: Record<PatientPriority, string> = { high: '🔴', medium: '🟡', low: '🟢' }
+const PRIORITY_LABEL: Record<PatientPriority, string> = { high: 'High priority', medium: 'Medium priority', low: 'Low priority' }
 
 interface Props {
   patient: Patient
@@ -13,8 +16,18 @@ export function PatientCard({ patient, onEdit, onToggleStatus }: Props) {
   return (
     <div className={`bg-surface rounded-2xl border border-line-soft shadow-sm flex items-stretch overflow-hidden ${inactive ? 'opacity-60' : ''}`}>
       <button onClick={onEdit} className="flex-1 flex items-center gap-3 px-4 py-3.5 text-left min-w-0">
-        <div className="w-12 h-12 shrink-0 rounded-full bg-primary-100 text-accent font-bold text-[16px] flex items-center justify-center tracking-wide">
-          {patient.initials}
+        <div className="relative w-12 h-12 shrink-0">
+          <div className="w-12 h-12 rounded-full bg-primary-100 text-accent font-bold text-[16px] flex items-center justify-center tracking-wide">
+            {patient.initials}
+          </div>
+          <span
+            className="absolute -top-0.5 -right-0.5 text-[10px] leading-none"
+            role="img"
+            aria-label={PRIORITY_LABEL[patient.priority]}
+            title={PRIORITY_LABEL[patient.priority]}
+          >
+            {PRIORITY_DOT[patient.priority]}
+          </span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

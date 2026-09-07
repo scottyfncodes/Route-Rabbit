@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { formatTime } from '../../lib/time'
-import { WEEKDAYS, type Patient, type PatientConflict, type Weekday } from '../../types'
+import { WEEKDAYS, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
 const VISITS_PER_WEEK_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
+const PRIORITY_OPTIONS: Array<{ value: PatientPriority; label: string; dot: string }> = [
+  { value: 'high', label: 'High', dot: '🔴' },
+  { value: 'medium', label: 'Medium', dot: '🟡' },
+  { value: 'low', label: 'Low', dot: '🟢' },
+]
 
 function newConflictId(): string {
   return `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -19,6 +24,8 @@ export interface PatientFormValues {
   visitsPerWeek: number | null
   conflicts: PatientConflict[]
   notes: string
+  priority: PatientPriority
+  makeupAvailable: boolean
 }
 
 function valuesFrom(patient?: Patient): PatientFormValues {
@@ -33,6 +40,8 @@ function valuesFrom(patient?: Patient): PatientFormValues {
       visitsPerWeek: null,
       conflicts: [],
       notes: '',
+      priority: 'medium',
+      makeupAvailable: false,
     }
   }
   return {
@@ -45,6 +54,8 @@ function valuesFrom(patient?: Patient): PatientFormValues {
     visitsPerWeek: patient.visitsPerWeek,
     conflicts: patient.conflicts,
     notes: patient.notes ?? '',
+    priority: patient.priority,
+    makeupAvailable: patient.makeupAvailable,
   }
 }
 
@@ -250,6 +261,40 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
             e.g. Tue 12:00–1:00 for a recurring lunch pickup. The route works around these automatically.
           </p>
         </div>
+
+        <div>
+          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Scheduling priority</label>
+          <div className="grid grid-cols-3 gap-2">
+            {PRIORITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => set('priority', opt.value)}
+                className={`py-3 rounded-xl font-semibold text-[14px] border-2 flex items-center justify-center gap-1.5 ${
+                  values.priority === opt.value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
+                }`}
+              >
+                <span>{opt.dot}</span>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-subtle mt-1.5">
+            Who to call first when a make-up slot opens up. An administrative scheduling preference, not a clinical priority.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-3 bg-surface rounded-2xl border border-line-soft px-4 py-3.5">
+          <input
+            type="checkbox"
+            checked={values.makeupAvailable}
+            onChange={(e) => set('makeupAvailable', e.target.checked)}
+            className="w-5 h-5 shrink-0 accent-primary-600"
+          />
+          <span className="min-w-0">
+            <span className="block text-[14.5px] font-semibold text-ink">Available for make-up visits</span>
+            <span className="block text-[12.5px] text-muted">Can fill an opening from someone else's cancellation, even on a day they aren't normally scheduled.</span>
+          </span>
+        </label>
 
         <div>
           <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Scheduling notes (optional)</label>

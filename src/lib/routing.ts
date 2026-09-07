@@ -16,6 +16,8 @@ export interface RoutingInput {
   /** Forecasted driving impact for this date, if known -- slows the effective speed used for every leg. */
   weatherImpact?: WeatherImpact
   weatherLabel?: string
+  /** Patients added today as a make-up visit -- exempt from the regular availableDays check for this date only. */
+  makeupPatientIds?: string[]
 }
 
 const OPEN_BLOCK_THRESHOLD_MINUTES = 15
@@ -276,12 +278,13 @@ function buildStopId(prefix: string, key: string): string {
 }
 
 export function buildRoute(input: RoutingInput): BuiltRoute {
-  const { date, dayStartTime, startLocation, endLocation, patients, lunch, weatherImpact = 0, weatherLabel } = input
+  const { date, dayStartTime, startLocation, endLocation, patients, lunch, weatherImpact = 0, weatherLabel, makeupPatientIds } = input
   const avgSpeedMph = input.avgSpeedMph * speedMultiplierFor(weatherImpact)
   const weekday = weekdayOf(date)
   const dayStartMinutes = toMinutes(dayStartTime)
   const conflicts: RouteConflict[] = []
   const weatherNote = weatherLabel ? weatherAdvisory(weatherImpact, weatherLabel) : null
+  const makeupSet = new Set(makeupPatientIds ?? [])
 
   if (!startLocation.geo) {
     conflicts.push({ message: `Starting location "${startLocation.label}" couldn't be located. Set a valid start address on the Home tab.` })
@@ -290,7 +293,7 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
   const eligible: Patient[] = []
   for (const patient of patients) {
     if (patient.status !== 'active') continue
-    if (!patient.availableDays.includes(weekday)) {
+    if (!patient.availableDays.includes(weekday) && !makeupSet.has(patient.id)) {
       conflicts.push({ patientId: patient.id, message: `${patient.initials} isn't available on ${weekday}.` })
       continue
     }

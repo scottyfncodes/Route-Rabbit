@@ -13,7 +13,7 @@ export type NewPatientInput = Omit<Patient, 'id' | 'geo' | 'status' | 'createdAt
 
 /** Fills in fields added after a patient may have already been saved to storage. */
 function withDefaults(p: Partial<Patient>): Patient {
-  return { visitsPerWeek: null, conflicts: [], ...p } as Patient
+  return { visitsPerWeek: null, conflicts: [], priority: 'medium', makeupAvailable: false, ...p } as Patient
 }
 
 export function usePatients() {
