@@ -46,7 +46,26 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   )
   const cancelledToday = plan.cancelledPatientIds.map((id) => patientsById.get(id)).filter((p): p is Patient => Boolean(p))
 
-  const computeResult = (cancelledIds: string[], patientIds: string[] = plan.patientIds, makeupIds: string[] = plan.makeupPatientIds): BuiltRoute => {
+  /**
+   * Visits already done (or underway) today -- every visit up to and including the stop marked
+   * "I'm Here". A mid-day rebuild keeps these in place and only re-plans what's left.
+   */
+  const visitedPatientIds = (): string[] => {
+    const builtStops = plan.result?.stops ?? []
+    const activeIdx = builtStops.findIndex((s) => s.id === plan.activeStopId)
+    if (activeIdx === -1) return []
+    return builtStops
+      .slice(0, activeIdx + 1)
+      .filter((s) => s.kind === 'visit' && s.patientId)
+      .map((s) => s.patientId as string)
+  }
+
+  const computeResult = (
+    cancelledIds: string[],
+    patientIds: string[] = plan.patientIds,
+    makeupIds: string[] = plan.makeupPatientIds,
+    lockedIds: string[] = [],
+  ): BuiltRoute => {
     const dayPatients = patientIds
       .filter((id) => !cancelledIds.includes(id))
       .map((id) => patientsById.get(id))
@@ -65,6 +84,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
       weatherImpact: dayWeather?.impact,
       weatherLabel: dayWeather?.label,
       makeupPatientIds: makeupIds,
+      lockedPatientIds: lockedIds.filter((id) => !cancelledIds.includes(id)),
     })
   }
 
@@ -79,7 +99,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
 
   const rebuildWithCancelled = (cancelledIds: string[]) => {
     const prevResult = plan.result
-    const result = computeResult(cancelledIds)
+    const result = computeResult(cancelledIds, plan.patientIds, plan.makeupPatientIds, visitedPatientIds())
     updatePlan({ cancelledPatientIds: cancelledIds, result })
     if (prevResult) {
       setDelta({
@@ -110,7 +130,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
     const newCancelled = plan.cancelledPatientIds.includes(cancelledId) ? plan.cancelledPatientIds : [...plan.cancelledPatientIds, cancelledId]
     const newPatientIds = plan.patientIds.includes(makeupId) ? plan.patientIds : [...plan.patientIds, makeupId]
     const newMakeupIds = plan.makeupPatientIds.includes(makeupId) ? plan.makeupPatientIds : [...plan.makeupPatientIds, makeupId]
-    const result = computeResult(newCancelled, newPatientIds, newMakeupIds)
+    const result = computeResult(newCancelled, newPatientIds, newMakeupIds, visitedPatientIds())
     updatePlan({ cancelledPatientIds: newCancelled, patientIds: newPatientIds, makeupPatientIds: newMakeupIds, result })
     if (prevResult) {
       setDelta({

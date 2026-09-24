@@ -68,11 +68,11 @@ export function speedMultiplierFor(impact: WeatherImpact): number {
  * a free, no-API-key weather service. Results are cached in localStorage for a
  * short while so the dashboard and route builder don't refetch on every render.
  */
-export async function fetchWeather(geo: GeoPoint): Promise<WeatherForecast | null> {
+export async function fetchWeather(geo: GeoPoint, options: { force?: boolean } = {}): Promise<WeatherForecast | null> {
   const key = cacheKeyFor(geo)
   const cache = readStorage<Record<string, WeatherForecast>>(CACHE_KEY, {})
   const cached = cache[key]
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached
+  if (!options.force && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached
 
   try {
     const params = new URLSearchParams({

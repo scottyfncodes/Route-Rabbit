@@ -30,7 +30,8 @@ change mid-day.
   slows that day's estimated drive times and shows a heads-up banner on its
   overview.
 - **Rebuild Route.** Cancel a visit mid-day and rebuild in seconds -- new order,
-  new times, new drive estimate, with the time saved shown clearly.
+  new times, new drive estimate, with the time saved shown clearly. Visits up to
+  the stop you've marked "I'm Here" stay put; only the rest of the day is re-planned.
 - **Cancellation + make-up visits.** Cancelling a visit walks you through finding a
   replacement: ranked make-up candidates (High/Medium/Low scheduling priority first,
   then least added drive time) who are marked available for make-up visits, fit the
@@ -67,6 +68,14 @@ npm install
 npm run dev
 ```
 
+Before pushing, run the same checks CI does:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
 Open the app, dismiss the privacy notice, set a start location on the Home
 tab, then add patients (initials, address, duration, available days/window)
 on the Patients tab before building a route.
@@ -86,7 +95,11 @@ src/
                        the day-overview screen reached from Weekly
 ```
 
-The routing algorithm (`src/lib/routing.ts`) is a practical greedy + 2-opt
-local search, not a commercial-grade solver -- it never produces a schedule
+The routing algorithm (`src/lib/routing.ts`) is a practical greedy
+construction followed by local search (2-opt segment reversals plus single-visit
+relocations), not a commercial-grade solver -- it never produces a schedule
 that violates a patient's availability window, and clearly surfaces a
-schedule conflict when one can't be avoided.
+schedule conflict when one can't be avoided. Lunch goes into a natural gap
+when there is one; otherwise later visits slide back to make room, as long as
+every one of them still fits its own window. Unit tests for the routing,
+make-up, and time logic live next to the code as `*.test.ts` (Vitest).

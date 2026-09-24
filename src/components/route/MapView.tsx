@@ -42,7 +42,8 @@ export function MapView({ stops }: Props) {
 
   return (
     <div className="rounded-2xl overflow-hidden border border-line-soft" style={{ height: 260 }}>
-      <MapContainer bounds={bounds} boundsOptions={{ padding: [28, 28] }} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
+      {/* Leaflet only reads `bounds` on mount -- re-key so a rebuilt route is re-framed. */}
+      <MapContainer key={points.join(';')} bounds={bounds} boundsOptions={{ padding: [28, 28] }} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
         <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polyline positions={points} pathOptions={{ color: '#26827a', weight: 3, opacity: 0.7, dashArray: '6 6' }} />
         {located.map((stop) => {

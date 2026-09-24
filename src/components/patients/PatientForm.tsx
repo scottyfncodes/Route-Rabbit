@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatTime } from '../../lib/time'
+import { formatTime, toMinutes } from '../../lib/time'
 import { WEEKDAYS, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
@@ -95,6 +95,9 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
     if (!values.address.trim()) return setError('Enter a home address.')
     if (values.availableDays.length === 0) return setError('Pick at least one available day.')
     if (values.windowStart >= values.windowEnd) return setError('End time must be after start time.')
+    if (toMinutes(values.windowEnd) - toMinutes(values.windowStart) < values.visitDuration) {
+      return setError(`A ${values.visitDuration}-min visit doesn't fit in a ${formatTime(values.windowStart)}–${formatTime(values.windowEnd)} window.`)
+    }
     setError(null)
     onSave({ ...values, initials })
   }
