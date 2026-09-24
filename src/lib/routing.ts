@@ -18,6 +18,12 @@ export interface RoutingInput {
   weatherLabel?: string
   /** Patients added today as a make-up visit -- exempt from the regular availableDays check for this date only. */
   makeupPatientIds?: string[]
+  /**
+   * Patients already visited (or in progress) today, in the order they were seen. They
+   * stay at the front of the route in this exact order; only the rest of the day is
+   * re-optimized -- so a mid-day rebuild never reshuffles visits that already happened.
+   */
+  lockedPatientIds?: string[]
 }
 
 const OPEN_BLOCK_THRESHOLD_MINUTES = 15
@@ -200,35 +206,54 @@ function scheduleScore(result: { finishMinutes: number; totalDriveMinutes: numbe
   return result.finishMinutes + result.totalDriveMinutes * 0.1
 }
 
-/** Local-search improvement: try reversing sub-segments (2-opt) to tighten the day. */
-function twoOptImprove(
+/**
+ * Candidate reorderings of `order` for local search: every sub-segment reversal
+ * (2-opt) and every single-visit relocation (or-opt). The first `fixedCount`
+ * visits are never moved.
+ */
+function* neighborhood(order: Patient[], fixedCount: number): Generator<Patient[]> {
+  const n = order.length
+  for (let i = fixedCount; i < n - 1; i++) {
+    for (let j = i + 1; j < n; j++) {
+      yield [...order.slice(0, i), ...order.slice(i, j + 1).reverse(), ...order.slice(j + 1)]
+    }
+  }
+  for (let i = fixedCount; i < n; i++) {
+    const without = [...order.slice(0, i), ...order.slice(i + 1)]
+    for (let j = fixedCount; j < n; j++) {
+      if (j === i || j === i - 1) continue // same order as today (or a plain swap already covered by 2-opt)
+      yield [...without.slice(0, j), order[i], ...without.slice(j)]
+    }
+  }
+}
+
+/** Local-search improvement: keep applying the first reversal/relocation that tightens the day until none does. */
+function improveOrder(
   order: Patient[],
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
   avgSpeedMph: number,
   weekday: Weekday,
+  fixedCount = 0,
 ): Patient[] {
   let best = order
   let bestResult = simulateOrder(best, start, dayStartMinutes, avgSpeedMph, weekday)
   if (!bestResult.feasible) return best
 
+  let evaluations = 0
+  const MAX_EVALUATIONS = 20000
   let improved = true
-  let iterations = 0
-  const MAX_ITERATIONS = 300
 
-  while (improved && iterations < MAX_ITERATIONS) {
+  while (improved && evaluations < MAX_EVALUATIONS) {
     improved = false
-    for (let i = 0; i < best.length - 1 && !improved; i++) {
-      for (let j = i + 1; j < best.length; j++) {
-        iterations++
-        const candidate = [...best.slice(0, i), ...best.slice(i, j + 1).reverse(), ...best.slice(j + 1)]
-        const result = simulateOrder(candidate, start, dayStartMinutes, avgSpeedMph, weekday)
-        if (result.feasible && scheduleScore(result) < scheduleScore(bestResult) - 0.01) {
-          best = candidate
-          bestResult = result
-          improved = true
-          break
-        }
+    for (const candidate of neighborhood(best, fixedCount)) {
+      if (++evaluations > MAX_EVALUATIONS) break
+      const result = simulateOrder(candidate, start, dayStartMinutes, avgSpeedMph, weekday)
+      if (result.feasible && scheduleScore(result) < scheduleScore(bestResult) - 0.01) {
+        best = candidate
+        bestResult = result
+        improved = true
+        break
       }
     }
   }
@@ -240,16 +265,27 @@ interface LunchPlacement {
   index: number // insert lunch after this many visits (0 = before first visit)
   start: number
   end: number
+  /** The day's visits with lunch in place -- visits after the lunch may have shifted later to make room. */
+  visits: ScheduledVisit[]
 }
 
+/**
+ * Finds where lunch goes. Prefers an existing gap in the day (no visit moves);
+ * failing that, inserts lunch and pushes the following visits later, as long as
+ * every one of them still fits its own window and blocked times.
+ */
 function findLunchPlacement(
   visits: ScheduledVisit[],
   lunch: LunchPreference,
+  start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
+  avgSpeedMph: number,
+  weekday: Weekday,
 ): LunchPlacement | null {
   if (!lunch.enabled) return null
   const earliest = toMinutes(lunch.earliest)
   const latest = toMinutes(lunch.latest)
+  const midpoint = (earliest + latest) / 2
 
   const boundary = (idx: number) => (idx === 0 ? dayStartMinutes : visits[idx - 1].depart)
 
@@ -257,16 +293,40 @@ function findLunchPlacement(
   let bestDistance = Infinity
 
   for (let idx = 0; idx <= visits.length; idx++) {
-    const availableAt = boundary(idx)
-    const nextArrive = idx < visits.length ? visits[idx].arrive : Infinity
-    const lunchStart = Math.max(availableAt, earliest)
+    const lunchStart = Math.max(boundary(idx), earliest)
     const lunchEnd = lunchStart + lunch.duration
     if (lunchStart > latest) continue
-    if (lunchEnd > nextArrive) continue // would eat into the next visit's own travel/window
-    const distance = Math.abs(lunchStart - (earliest + latest) / 2)
+    // Lunch happens where the previous stop left off, so the drive to the next visit has to come after it.
+    const mustLeaveBy = idx < visits.length ? visits[idx].arrive - visits[idx].driveMinutes : Infinity
+    if (lunchEnd > mustLeaveBy) continue
+    const distance = Math.abs(lunchStart - midpoint)
     if (distance < bestDistance) {
       bestDistance = distance
-      best = { index: idx, start: lunchStart, end: lunchEnd }
+      best = { index: idx, start: lunchStart, end: lunchEnd, visits }
+    }
+  }
+  if (best) return best
+
+  // No natural gap: try making one by shifting the rest of the day later.
+  let bestFinish = Infinity
+  for (let idx = 0; idx < visits.length; idx++) {
+    const lunchStart = Math.max(boundary(idx), earliest)
+    if (lunchStart > latest) continue
+    const lunchEnd = lunchStart + lunch.duration
+    const fromGeo = idx === 0 ? start.geo : (visits[idx - 1].patient.geo ?? start.geo)
+    const rest = simulateOrder(
+      visits.slice(idx).map((v) => v.patient),
+      { geo: fromGeo },
+      lunchEnd,
+      avgSpeedMph,
+      weekday,
+    )
+    if (!rest.feasible) continue
+    const distance = Math.abs(lunchStart - midpoint)
+    if (rest.finishMinutes < bestFinish - 0.01 || (Math.abs(rest.finishMinutes - bestFinish) <= 0.01 && distance < bestDistance)) {
+      bestFinish = rest.finishMinutes
+      bestDistance = distance
+      best = { index: idx, start: lunchStart, end: lunchEnd, visits: [...visits.slice(0, idx), ...rest.visits] }
     }
   }
 
@@ -304,7 +364,21 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     eligible.push(patient)
   }
 
-  const { order: constructed, unscheduled } = greedyConstruct(eligible, startLocation, dayStartMinutes, avgSpeedMph, weekday)
+  // Visits that already happened today keep their order; everything else is planned from where they leave off.
+  const eligibleById = new Map(eligible.map((p) => [p.id, p]))
+  const locked = (input.lockedPatientIds ?? []).map((id) => eligibleById.get(id)).filter((p): p is Patient => Boolean(p))
+  const lockedIds = new Set(locked.map((p) => p.id))
+  const lockedRun = simulateOrder(locked, startLocation, dayStartMinutes, avgSpeedMph, weekday)
+  const resumeGeo = locked.length > 0 ? (locked[locked.length - 1].geo ?? startLocation.geo) : startLocation.geo
+
+  const { order: constructedRest, unscheduled } = greedyConstruct(
+    eligible.filter((p) => !lockedIds.has(p.id)),
+    { geo: resumeGeo },
+    lockedRun.finishMinutes,
+    avgSpeedMph,
+    weekday,
+  )
+  const constructed = [...locked, ...constructedRest]
   for (const patient of unscheduled) {
     const hasConflictsToday = patient.conflicts.some((c) => c.day === weekday)
     conflicts.push({
@@ -315,10 +389,11 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     })
   }
 
-  const optimizedOrder = twoOptImprove(constructed, startLocation, dayStartMinutes, avgSpeedMph, weekday)
-  const { visits } = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, avgSpeedMph, weekday)
+  const optimizedOrder = improveOrder(constructed, startLocation, dayStartMinutes, avgSpeedMph, weekday, locked.length)
+  const simulated = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, avgSpeedMph, weekday).visits
 
-  const lunchPlacement = findLunchPlacement(visits, lunch, dayStartMinutes)
+  const lunchPlacement = findLunchPlacement(simulated, lunch, startLocation, dayStartMinutes, avgSpeedMph, weekday)
+  const visits = lunchPlacement?.visits ?? simulated
   if (lunch.enabled && !lunchPlacement) {
     conflicts.push({ message: `Couldn't fit a ${lunch.duration}-min lunch between ${lunch.earliest}–${lunch.latest} without breaking a patient window. Add it manually or widen the lunch window.` })
   }

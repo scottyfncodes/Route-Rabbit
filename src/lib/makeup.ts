@@ -30,12 +30,17 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
   return aStart < bEnd && bStart < aEnd
 }
 
-/** Would this slot fit inside the patient's own window without landing on one of their blocked times? */
-function fitsWindow(patient: Patient, weekday: Weekday, slotStart: number, slotEnd: number): boolean {
+/**
+ * Would this patient's own visit fit in the opened slot -- no longer than the slot, and
+ * inside their window without landing on one of their blocked times?
+ */
+function fitsSlot(patient: Patient, weekday: Weekday, slotStart: number, slotEnd: number): boolean {
+  const visitEnd = slotStart + patient.visitDuration
+  if (visitEnd > slotEnd) return false
   const windowStart = toMinutes(patient.windowStart)
   const windowEnd = toMinutes(patient.windowEnd)
-  if (slotStart < windowStart || slotEnd > windowEnd) return false
-  return !patient.conflicts.some((c) => c.day === weekday && overlaps(slotStart, slotEnd, toMinutes(c.startTime), toMinutes(c.endTime)))
+  if (slotStart < windowStart || visitEnd > windowEnd) return false
+  return !patient.conflicts.some((c) => c.day === weekday && overlaps(slotStart, visitEnd, toMinutes(c.startTime), toMinutes(c.endTime)))
 }
 
 /** Extra one-way driving this candidate would add versus the route just going straight from prev to next. */
@@ -50,9 +55,10 @@ function routeImpactMinutes(candidateGeo: GeoPoint | null, prevGeo: GeoPoint | n
 /**
  * Finds and ranks patients who could reasonably fill a just-opened slot.
  *
- * Eligibility (all required): active status, marked available for make-up visits, not
- * already on today's route, and the slot fits inside their own window without hitting a
- * blocked time -- the same hard constraints the router already enforces for regular visits.
+ * Eligibility (all required): active status, marked available for make-up visits, a
+ * located address, not already on today's route, and the slot fits inside their own window without hitting a
+ * blocked time (using their own visit length, which can't run past the
+ * opening) -- the same hard constraints the router already enforces for regular visits.
  * Availability on the cancelled day's *regular* schedule is deliberately not required: a
  * make-up visit is, by definition, outside someone's normal routine.
  *
@@ -70,13 +76,18 @@ export function findMakeupCandidates(input: FindMakeupCandidatesInput): MakeupCa
     .filter((p) => p.status === 'active')
     .filter((p) => p.makeupAvailable)
     .filter((p) => !scheduledSet.has(p.id))
-    .filter((p) => fitsWindow(p, weekday, start, end))
+    .filter((p) => p.geo !== null) // the router can't place an address it couldn't locate
+    .filter((p) => fitsSlot(p, weekday, start, end))
     .map((patient) => ({ patient, extraDriveMinutes: routeImpactMinutes(patient.geo, prevStopGeo, nextStopGeo, avgSpeedMph) }))
 
   candidates.sort((a, b) => {
     const rankDiff = PRIORITY_RANK[a.patient.priority] - PRIORITY_RANK[b.patient.priority]
     if (rankDiff !== 0) return rankDiff
-    return (a.extraDriveMinutes ?? Infinity) - (b.extraDriveMinutes ?? Infinity)
+    // Unknown drive impact sorts last within its tier (and never yields NaN from Infinity - Infinity).
+    if (a.extraDriveMinutes === null || b.extraDriveMinutes === null) {
+      return Number(a.extraDriveMinutes === null) - Number(b.extraDriveMinutes === null)
+    }
+    return a.extraDriveMinutes - b.extraDriveMinutes
   })
 
   return candidates

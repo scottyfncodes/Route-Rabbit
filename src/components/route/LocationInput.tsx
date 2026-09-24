@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { geocodeAddress } from '../../lib/geocode'
 import type { NamedLocation } from '../../types'
 
@@ -17,9 +17,14 @@ interface Props {
  */
 export function LocationInput({ label, value, onChange, placeholder }: Props) {
   const [text, setText] = useState(value.address)
+  const [syncedAddress, setSyncedAddress] = useState(value.address)
   const [locating, setLocating] = useState(false)
 
-  useEffect(() => setText(value.address), [value.address])
+  // Pick up address changes made elsewhere (e.g. switching days) without an effect round-trip.
+  if (value.address !== syncedAddress) {
+    setSyncedAddress(value.address)
+    setText(value.address)
+  }
 
   const dirty = text !== value.address
 

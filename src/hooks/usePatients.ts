@@ -47,6 +47,9 @@ export function usePatients() {
 
   const updatePatient = useCallback(
     (id: string, changes: Partial<Omit<Patient, 'id'>>) => {
+      // Re-geocode on a new address, or retry an address that couldn't be located before.
+      const existing = patients.find((p) => p.id === id)
+      const needsGeocode = changes.address !== undefined && (existing?.address !== changes.address || !existing?.geo)
       setPatients((prev) =>
         prev.map((p) => {
           if (p.id !== id) return p
@@ -55,9 +58,9 @@ export function usePatients() {
           return next
         }),
       )
-      if (changes.address) geocodeInBackground(id, changes.address)
+      if (needsGeocode && changes.address) geocodeInBackground(id, changes.address)
     },
-    [geocodeInBackground],
+    [patients, geocodeInBackground],
   )
 
   const removePatient = useCallback((id: string) => {

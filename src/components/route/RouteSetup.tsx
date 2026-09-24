@@ -27,7 +27,7 @@ export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient
           label="Start location"
           value={plan.startLocation}
           placeholder="Home address"
-          onChange={(loc) => onUpdatePlan(sameAsStart ? { startLocation: loc, endLocation: loc } : { startLocation: loc })}
+          onChange={(loc) => onUpdatePlan(sameAsStart ? { startLocation: loc, endLocation: { ...loc, label: 'End' } } : { startLocation: loc })}
         />
         <label className="flex items-center gap-2.5 py-0.5">
           <input
@@ -36,7 +36,7 @@ export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient
             onChange={(e) => {
               const same = e.target.checked
               setSameAsStart(same)
-              if (same) onUpdatePlan({ endLocation: plan.startLocation })
+              if (same) onUpdatePlan({ endLocation: { ...plan.startLocation, label: 'End' } })
             }}
             className="w-5 h-5 shrink-0 accent-primary-600"
           />

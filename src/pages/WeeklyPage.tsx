@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { buildWeekRoutes, readWeekPlans, type WeekBuildSummary } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
@@ -16,12 +16,11 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
   const { patients } = patientsApi
   const { forecast: weather } = useWeather(settings.homeGeo)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayStr()))
-  const [refreshKey, setRefreshKey] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const [building, setBuilding] = useState(false)
   const [summary, setSummary] = useState<WeekBuildSummary | null>(null)
 
-  const plans = useMemo(() => readWeekPlans(), [weekStart, refreshKey])
+  const [plans, setPlans] = useState(readWeekPlans)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const today = todayStr()
   const activePatientCount = patients.filter((p) => p.status === 'active').length
@@ -43,7 +42,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
     window.setTimeout(() => {
       const result = buildWeekRoutes(weekStart, patients, settings, weather?.daily)
       setSummary(result)
-      setRefreshKey((k) => k + 1)
+      setPlans(readWeekPlans())
       setBuilding(false)
     }, 30)
   }

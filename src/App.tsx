@@ -29,6 +29,7 @@ export default function App() {
 
       {dayView ? (
         <TodayPage
+          key={dayView}
           patientsApi={patientsApi}
           settings={settings}
           date={dayView}
