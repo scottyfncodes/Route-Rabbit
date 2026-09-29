@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { WeatherWidget } from '../components/dashboard/WeatherWidget'
 import { LocationInput } from '../components/route/LocationInput'
 import { QuickActions } from '../components/route/QuickActions'
+import { RoadsNearYouCard } from '../components/road/RoadsNearYouCard'
 import { useWeather } from '../hooks/useWeather'
+import { useRoadSnapshot } from '../hooks/useRoadSnapshot'
 import { readWeekPlans } from '../hooks/useDayPlan'
 import { addDays, startOfWeek, todayStr } from '../lib/time'
 import type { AppSettings, NamedLocation } from '../types'
@@ -18,6 +20,7 @@ interface Props {
 
 export function HomePage({ settings, updateSettings, patientsApi, onNavigate }: Props) {
   const { forecast, loading, refresh } = useWeather(settings.homeGeo)
+  const roads = useRoadSnapshot()
 
   const [customEnd, setCustomEnd] = useState(() => Boolean(settings.endAddress.trim()))
 
@@ -45,6 +48,10 @@ export function HomePage({ settings, updateSettings, patientsApi, onNavigate }: 
 
       <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-5">
         <WeatherWidget forecast={forecast} loading={loading} hasLocation={Boolean(settings.homeGeo)} onRefresh={refresh} />
+
+        {roads.snapshot && settings.homeGeo && (
+          <RoadsNearYouCard snapshot={roads.snapshot} geo={settings.homeGeo} loading={roads.loading} onRefresh={roads.refresh} />
+        )}
 
         <div className="bg-surface rounded-2xl border border-line-soft px-4 py-4 space-y-3">
           <h2 className="text-[13px] font-bold text-label uppercase tracking-wide">Start &amp; end location</h2>

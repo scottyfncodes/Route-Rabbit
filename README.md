@@ -29,6 +29,14 @@ change mid-day.
   conditions and a short outlook; a rainy/snowy forecast for a given day
   slows that day's estimated drive times and shows a heads-up banner on its
   overview.
+- **Live Colorado road alerts (CDOT COtrip).** Each day's overview checks the built
+  route against CDOT's live incidents, planned construction/closures and road-surface
+  reports: a "road heads-up" card lists what's along the way (when it's active, which
+  leg it's on, how far off the route), the map pins alerts and colors slick segments,
+  the timeline badges affected drives, and the Next Stop card warns before you
+  navigate. Construction scheduled outside your working hours is left out. Icy or
+  snow-packed roads on today's route slow its drive estimates, the same way a snowy
+  forecast does. Home shows what's reported within 10 miles of your start point.
 - **Rebuild Route.** Cancel a visit mid-day and rebuild in seconds -- new order,
   new times, new drive estimate, with the time saved shown clearly. Visits up to
   the stop you've marked "I'm Here" stay put; only the rest of the day is re-planned.
@@ -46,6 +54,17 @@ change mid-day.
   copy/pasting addresses. Available on the Home dashboard and on each day's
   overview.
 - **Timeline + map view** and daily efficiency stats for every built day.
+
+## COtrip road data
+
+Road data comes from CDOT's COtrip API through a small Vercel serverless function
+(`api/cotrip.ts`) so the API key never reaches the browser. Set `COTRIP_API_KEY` in
+the Vercel project's environment variables. `/api/cotrip?feed=snapshot` fetches
+incidents, planned events and road conditions in one go and trims them (the raw
+road-conditions feed is several MB) to the compact shapes in `api/_lib/cotrip.ts`;
+responses are CDN-cached for two minutes. Only the public road data passes through
+it -- no patient information is ever sent. Off Vercel (GitHub Pages, plain
+`npm run dev`) the function doesn't exist and road features simply stay hidden.
 
 ## Privacy
 

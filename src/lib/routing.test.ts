@@ -171,6 +171,17 @@ describe('buildRoute', () => {
     expect(clear.weatherNote).toBeNull()
   })
 
+  it('slows drive estimates for slick roads, taking the worse of road and weather', () => {
+    const p = patient({ geo: east(10) })
+    const clear = buildRoute(input([p]))
+    const icy = buildRoute(input([p], { roadImpact: 2, roadNote: 'Icy on I-70' }))
+    const both = buildRoute(input([p], { roadImpact: 2, roadNote: 'Icy on I-70', weatherImpact: 1, weatherLabel: 'Light snow' }))
+    expect(icy.totalDriveMinutes).toBeGreaterThan(clear.totalDriveMinutes)
+    expect(both.totalDriveMinutes).toBe(icy.totalDriveMinutes)
+    expect(icy.roadNote).toBe('Icy on I-70')
+    expect(clear.roadNote).toBeNull()
+  })
+
   it('builds a Google Maps link only when there are visits', () => {
     expect(buildRoute(input([])).googleMapsUrl).toBeNull()
     expect(buildRoute(input([patient()])).googleMapsUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/dir\//)

@@ -8,12 +8,15 @@ import { MapView } from '../components/route/MapView'
 import { QuickActions } from '../components/route/QuickActions'
 import { NextStopCard } from '../components/route/NextStopCard'
 import { CancelVisitModal } from '../components/route/CancelVisitModal'
+import { RouteRoadsCard } from '../components/road/RouteRoadsCard'
 import { useDayPlan } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
-import { buildRoute } from '../lib/routing'
+import { useRoadSnapshot } from '../hooks/useRoadSnapshot'
+import { buildRoute, type RoutingInput } from '../lib/routing'
+import { alertsAlongRoute, conditionsAlongRoute, roadAdvisory, worstRoadImpact } from '../lib/roadAlerts'
 import { findMakeupCandidates } from '../lib/makeup'
 import { addDays, formatDateHeading, formatDuration, todayStr, weekdayOf } from '../lib/time'
-import type { AppSettings, BuiltRoute, Patient } from '../types'
+import type { AppSettings, BuiltRoute, Patient, RoadAlert } from '../types'
 import type { usePatients } from '../hooks/usePatients'
 
 interface Props {
@@ -34,6 +37,8 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
   const { patients } = patientsApi
   const { plan, updatePlan, togglePatientInDay, restorePatientToday } = useDayPlan(date, settings)
   const { forecast: weather } = useWeather(settings.homeGeo)
+  const { snapshot: roads, loading: roadsLoading, refresh: refreshRoads } = useRoadSnapshot()
+  const isToday = date === todayStr()
   const [showSetup, setShowSetup] = useState(!plan.result)
   const [delta, setDelta] = useState<Delta | null>(null)
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null)
@@ -73,7 +78,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
 
     const dayWeather = weather?.daily[date]
 
-    return buildRoute({
+    const routingInput: RoutingInput = {
       date,
       dayStartTime: plan.dayStartTime,
       startLocation: plan.startLocation,
@@ -85,7 +90,16 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
       weatherLabel: dayWeather?.label,
       makeupPatientIds: makeupIds,
       lockedPatientIds: lockedIds.filter((id) => !cancelledIds.includes(id)),
-    })
+    }
+    const firstPass = buildRoute(routingInput)
+
+    // Live CDOT surface reports only describe right now, so they only shape today's drive times.
+    // Which roads matter depends on the route itself: build once, check what it crosses, and
+    // rebuild with slower speeds if any of it is slick.
+    if (!isToday || !roads) return firstPass
+    const road = worstRoadImpact(conditionsAlongRoute(roads.conditions, firstPass.stops))
+    if (!road || road.impact === 0) return firstPass
+    return buildRoute({ ...routingInput, roadImpact: road.impact, roadNote: roadAdvisory(road) })
   }
 
   const orderLabel = (result: BuiltRoute) => result.stops.filter((s) => s.kind === 'visit').map((s) => s.label).join(' → ')
@@ -148,12 +162,22 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
     updatePlan({ activeStopId: stop.id, currentLocationOverride: { label: stop.label, address: stop.address ?? '', geo: stop.geo } })
   }
 
-  const stops = plan.result?.stops ?? []
+  const stops = useMemo(() => plan.result?.stops ?? [], [plan.result])
   const activeIdx = stops.findIndex((s) => s.id === plan.activeStopId)
   const nextStop = stops.slice(activeIdx + 1).find((s) => s.kind === 'visit')
   const currentLocation = plan.currentLocationOverride ?? plan.startLocation
 
   const canGoNext = date < addDays(todayStr(), 90)
+
+  // Road data is live, so it's matched at render time rather than frozen into the saved route.
+  const showRoads = Boolean(roads) && stops.length > 0 && date >= todayStr()
+  const routeAlerts = useMemo(() => (roads && showRoads ? alertsAlongRoute(roads.alerts, stops, date) : []), [roads, showRoads, stops, date])
+  const routeConditions = useMemo(() => (roads && showRoads && isToday ? conditionsAlongRoute(roads.conditions, stops) : null), [roads, showRoads, isToday, stops])
+  const legAlerts = useMemo(() => {
+    const byStop = new Map<string, RoadAlert[]>()
+    for (const m of routeAlerts) byStop.set(m.leg.to.id, [...(byStop.get(m.leg.to.id) ?? []), m.alert])
+    return byStop
+  }, [routeAlerts])
 
   const cancelTargetPatient = cancelTargetId ? patientsById.get(cancelTargetId) : undefined
   const cancelTargetStop = cancelTargetId ? stops.find((s) => s.patientId === cancelTargetId) : undefined
@@ -220,6 +244,24 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
               </div>
             )}
 
+            {plan.result.roadNote && (
+              <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl px-4 py-3.5 flex items-start gap-2.5">
+                <span className="text-[18px] leading-none">🛣️</span>
+                <p className="text-[13.5px] text-warning leading-snug">{plan.result.roadNote}</p>
+              </div>
+            )}
+
+            {roads && showRoads && (
+              <RouteRoadsCard
+                snapshot={roads}
+                date={date}
+                matches={routeAlerts}
+                conditions={routeConditions}
+                loading={roadsLoading}
+                onRefresh={refreshRoads}
+              />
+            )}
+
             {delta && (
               <div className="bg-mint-50 border-2 border-mint-200 rounded-2xl px-4 py-3.5">
                 <div className="font-bold text-[15px] text-accent mb-0.5">Route rebuilt</div>
@@ -260,7 +302,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
               </a>
             )}
 
-            {nextStop && <NextStopCard nextStop={nextStop} currentLocation={currentLocation} />}
+            {nextStop && <NextStopCard nextStop={nextStop} currentLocation={currentLocation} roadAlerts={legAlerts.get(nextStop.id)} />}
 
             <div>
               <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">On the road</h2>
@@ -269,7 +311,11 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
 
             <div>
               <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Map</h2>
-              <MapView stops={stops} />
+              <MapView
+                stops={stops}
+                alerts={routeAlerts.map((m) => m.alert)}
+                conditions={(routeConditions ?? []).filter((c) => c.impact > 0)}
+              />
             </div>
 
             <div>
@@ -279,6 +325,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
                 patientsById={patientsById}
                 activeStopId={plan.activeStopId}
                 makeupPatientIds={plan.makeupPatientIds}
+                legAlerts={legAlerts}
                 onImHere={(stop) => handleImHere(stop.id)}
                 onCancelPatient={handleCancelPatient}
               />
