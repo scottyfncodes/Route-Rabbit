@@ -1,9 +1,25 @@
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
 import { divIcon, type LatLngBoundsExpression, type LatLngTuple } from 'leaflet'
-import type { Stop } from '../../types'
+import { KIND_ICON } from '../../lib/roadAlerts'
+import type { RoadAlert, RoadCondition, Stop } from '../../types'
 
 interface Props {
   stops: Stop[]
+  /** CDOT alerts along the route, drawn as small pins. */
+  alerts?: RoadAlert[]
+  /** Slick/closed road segments along the route, drawn as colored lines under the route. */
+  conditions?: RoadCondition[]
+}
+
+const SEVERITY_RING: Record<RoadAlert['severity'], string> = { major: '#c94f3a', moderate: '#b6790a', minor: '#5c6966' }
+
+function alertIcon(alert: RoadAlert) {
+  return divIcon({
+    className: '',
+    html: `<div style="background:white;width:26px;height:26px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid ${SEVERITY_RING[alert.severity]};box-shadow:0 1px 3px rgba(0,0,0,0.3)">${KIND_ICON[alert.kind]}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
 }
 
 const KIND_STYLE: Record<Stop['kind'], { bg: string; text: string }> = {
@@ -25,7 +41,7 @@ function makeIcon(stop: Stop, sequenceNumber: number | null) {
   })
 }
 
-export function MapView({ stops }: Props) {
+export function MapView({ stops, alerts = [], conditions = [] }: Props) {
   const located = stops.filter((s) => s.geo)
   if (located.length === 0) {
     return (
@@ -45,6 +61,13 @@ export function MapView({ stops }: Props) {
       {/* Leaflet only reads `bounds` on mount -- re-key so a rebuilt route is re-framed. */}
       <MapContainer key={points.join(';')} bounds={bounds} boundsOptions={{ padding: [28, 28] }} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
         <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {conditions.map((c) => (
+          <Polyline key={c.id} positions={c.path} pathOptions={{ color: c.closed || c.impact === 2 ? '#c94f3a' : '#b6790a', weight: 6, opacity: 0.55 }}>
+            <Tooltip sticky>
+              {c.closed ? 'Closed' : c.label} · {c.route}
+            </Tooltip>
+          </Polyline>
+        ))}
         <Polyline positions={points} pathOptions={{ color: '#26827a', weight: 3, opacity: 0.7, dashArray: '6 6' }} />
         {located.map((stop) => {
           const seq = stop.kind === 'visit' ? ++visitCount : null
@@ -56,6 +79,14 @@ export function MapView({ stops }: Props) {
             </Marker>
           )
         })}
+        {alerts.map((alert) => (
+          <Marker key={alert.id} position={alert.points[0]} icon={alertIcon(alert)} zIndexOffset={-100}>
+            <Tooltip direction="top" offset={[0, -12]}>
+              {alert.title}
+              {alert.route ? ` · ${alert.route}` : ''}
+            </Tooltip>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   )

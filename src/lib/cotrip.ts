@@ -1,19 +1,33 @@
-// Client for the COtrip proxy in api/cotrip.ts. Only works when deployed on
-// Vercel (or under `vercel dev`), since the proxy is a serverless function.
+import type { CotripSnapshot } from '../types'
+import { readStorage, writeStorage } from './storage'
 
-export type CotripFeed =
-  | 'incidents'
-  | 'roadConditions'
-  | 'plannedEvents'
-  | 'weatherStations'
-  | 'snowPlows'
-  | 'destinations'
-  | 'signs'
-  | 'cwz'
-  | 'wzdx'
+const CACHE_KEY = 'cotripCache'
+/** Road alerts change faster than weather; the proxy's CDN cache is 2 minutes anyway. */
+const CACHE_TTL_MS = 5 * 60 * 1000
 
-export async function fetchCotripFeed<T = unknown>(feed: CotripFeed): Promise<T> {
-  const res = await fetch(`/api/cotrip?feed=${feed}`, { headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(`COtrip ${feed} request failed (${res.status})`)
-  return (await res.json()) as T
+interface Cached {
+  savedAt: number
+  snapshot: CotripSnapshot
+}
+
+/**
+ * Colorado road alerts + surface conditions from CDOT's COtrip feed, via the app's own
+ * /api/cotrip proxy (which holds the API key). Only available where that proxy runs --
+ * on Vercel -- so everywhere else (GitHub Pages, plain `vite` dev) this resolves to null
+ * and road features simply stay hidden.
+ */
+export async function fetchRoadSnapshot(options: { force?: boolean } = {}): Promise<CotripSnapshot | null> {
+  const cached = readStorage<Cached | null>(CACHE_KEY, null)
+  if (!options.force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.snapshot
+
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}api/cotrip?feed=snapshot`, { headers: { Accept: 'application/json' } })
+    if (!res.ok || !res.headers.get('Content-Type')?.includes('json')) return cached?.snapshot ?? null
+    const snapshot = (await res.json()) as CotripSnapshot
+    if (!Array.isArray(snapshot.alerts) || !Array.isArray(snapshot.conditions)) return cached?.snapshot ?? null
+    writeStorage<Cached>(CACHE_KEY, { savedAt: Date.now(), snapshot })
+    return snapshot
+  } catch {
+    return cached?.snapshot ?? null
+  }
 }

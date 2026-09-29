@@ -1,5 +1,6 @@
-import type { Patient, Stop } from '../../types'
+import type { Patient, RoadAlert, Stop } from '../../types'
 import { formatTimeShort } from '../../lib/time'
+import { KIND_ICON as ALERT_ICON } from '../../lib/roadAlerts'
 
 const KIND_ICON: Record<Stop['kind'], string> = {
   start: '🏠',
@@ -14,24 +15,36 @@ interface Props {
   patientsById: Map<string, Patient>
   activeStopId: string | null
   makeupPatientIds?: string[]
+  /** CDOT alerts on the drive into each stop, keyed by that stop's id. */
+  legAlerts?: Map<string, RoadAlert[]>
   onImHere: (stop: Stop) => void
   onCancelPatient: (patientId: string) => void
 }
 
-export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds = [], onImHere, onCancelPatient }: Props) {
+export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds = [], legAlerts, onImHere, onCancelPatient }: Props) {
   return (
     <div className="space-y-0">
       {stops.map((stop, idx) => {
         const patient = stop.patientId ? patientsById.get(stop.patientId) : undefined
         const isActive = stop.id === activeStopId
         const isVisit = stop.kind === 'visit'
+        const roadAlerts = legAlerts?.get(stop.id) ?? []
 
         return (
           <div key={stop.id}>
             {idx > 0 && stop.driveMinutesFromPrev > 0 && (
-              <div className="flex items-center gap-2 pl-6 py-1.5 text-[13px] text-muted">
+              <div className="flex flex-wrap items-center gap-2 pl-6 py-1.5 text-[13px] text-muted">
                 <span className="w-px h-4 bg-line ml-[7px]" />
                 <span>🚗 {Math.round(stop.driveMinutesFromPrev)} min drive{stop.driveMilesFromPrev > 0 ? ` · ${stop.driveMilesFromPrev} mi` : ''}</span>
+                {roadAlerts.length > 0 && (
+                  <span
+                    className={`text-[11.5px] font-bold rounded-full px-2 py-0.5 ${
+                      roadAlerts.some((a) => a.severity === 'major') ? 'bg-coral-50 text-danger' : 'bg-amber-50 text-warning'
+                    }`}
+                  >
+                    {ALERT_ICON[roadAlerts[0].kind]} {roadAlerts.length === 1 ? roadAlerts[0].title : `${roadAlerts.length} road alerts`}
+                  </span>
+                )}
               </div>
             )}
             <div

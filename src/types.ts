@@ -96,6 +96,8 @@ export interface BuiltRoute {
   conflicts: RouteConflict[]
   googleMapsUrl: string | null
   weatherNote: string | null
+  /** CDOT road-surface heads-up baked into this build's drive times (absent on routes built before it existed). */
+  roadNote?: string | null
 }
 
 export interface RouteConflict {
@@ -140,3 +142,6 @@ export interface WeatherForecast {
   current: CurrentWeather
   daily: Record<string, DayWeather>
 }
+
+// COtrip (CDOT) road data -- shapes are defined next to the serverless proxy that produces them.
+export type { CotripSnapshot, LatLng, RoadAlert, RoadAlertKind, RoadCondition } from '../api/_lib/cotrip'

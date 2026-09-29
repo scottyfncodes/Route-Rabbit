@@ -16,6 +16,9 @@ export interface RoutingInput {
   /** Forecasted driving impact for this date, if known -- slows the effective speed used for every leg. */
   weatherImpact?: WeatherImpact
   weatherLabel?: string
+  /** Current CDOT road-surface impact along the route (today only) -- combined with weather, the worse one wins. */
+  roadImpact?: WeatherImpact
+  roadNote?: string | null
   /** Patients added today as a make-up visit -- exempt from the regular availableDays check for this date only. */
   makeupPatientIds?: string[]
   /**
@@ -339,7 +342,8 @@ function buildStopId(prefix: string, key: string): string {
 
 export function buildRoute(input: RoutingInput): BuiltRoute {
   const { date, dayStartTime, startLocation, endLocation, patients, lunch, weatherImpact = 0, weatherLabel, makeupPatientIds } = input
-  const avgSpeedMph = input.avgSpeedMph * speedMultiplierFor(weatherImpact)
+  const roadImpact = input.roadImpact ?? 0
+  const avgSpeedMph = input.avgSpeedMph * speedMultiplierFor(Math.max(weatherImpact, roadImpact) as WeatherImpact)
   const weekday = weekdayOf(date)
   const dayStartMinutes = toMinutes(dayStartTime)
   const conflicts: RouteConflict[] = []
@@ -530,5 +534,6 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     conflicts,
     googleMapsUrl,
     weatherNote,
+    roadNote: roadImpact > 0 ? (input.roadNote ?? null) : null,
   }
 }
