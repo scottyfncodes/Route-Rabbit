@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/Route-Rabbit/',
+  // Vercel serves from the domain root; GitHub Pages serves from /Route-Rabbit/.
+  base: process.env.VERCEL ? '/' : '/Route-Rabbit/',
   plugins: [react(), tailwindcss()],
 })
