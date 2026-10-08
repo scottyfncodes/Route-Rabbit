@@ -35,11 +35,18 @@ export default function App() {
           date={dayView}
           onDateChange={setDayView}
           onBack={() => setDayView(null)}
+          backLabel={tab === 'today' ? 'Home' : 'Week'}
         />
       ) : (
         <>
           {tab === 'today' && (
-            <HomePage settings={settings} updateSettings={updateSettings} patientsApi={patientsApi} onNavigate={setTab} />
+            <HomePage
+              settings={settings}
+              updateSettings={updateSettings}
+              patientsApi={patientsApi}
+              onNavigate={setTab}
+              onOpenDay={setDayView}
+            />
           )}
           {tab === 'patients' && <PatientsPage patientsApi={patientsApi} />}
           {tab === 'weekly' && <WeeklyPage onSelectDate={setDayView} patientsApi={patientsApi} settings={settings} />}
@@ -47,7 +54,7 @@ export default function App() {
         </>
       )}
 
-      <BottomNav active={dayView ? 'weekly' : tab} onChange={handleTabChange} />
+      <BottomNav active={tab} onChange={handleTabChange} />
     </>
   )
 }

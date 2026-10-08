@@ -12,6 +12,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Route Rabbit" />
     <title>Route Rabbit</title>
+    <!-- Paint the app surface before the CSS bundle lands, so launch never flashes white. -->
+    <style>
+      html { background: #f5f6f4; }
+      html.dark { background: #0c1413; }
+    </style>
     <script>
       (function () {
         try {
