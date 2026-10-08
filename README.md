@@ -6,7 +6,7 @@ Maps for actual turn-by-turn navigation.
 
 ## Flow
 
-**Home** (set your start/end location + check the weather) -> **Patients**
+**Home** (today's route at a glance, or an example day until you add patients; start location and weather below) -> **Patients**
 (initials, address, duration, available days/window) -> **Weekly** (Build My
 Week lays out every day from who's available when) -> tap a day for its full
 timeline/map overview, with Rebuild Route and Cancel Patient for when plans

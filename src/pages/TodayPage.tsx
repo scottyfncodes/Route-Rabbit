@@ -22,6 +22,8 @@ interface Props {
   date: string
   onDateChange: (date: string) => void
   onBack?: () => void
+  /** Where Back returns to, e.g. "Week" or "Home". */
+  backLabel?: string
 }
 
 interface Delta {
@@ -30,7 +32,7 @@ interface Delta {
   newOrder: string
 }
 
-export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }: Props) {
+export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, backLabel = 'Week' }: Props) {
   const { patients } = patientsApi
   const { plan, updatePlan, togglePatientInDay, restorePatientToday } = useDayPlan(date, settings)
   const { forecast: weather } = useWeather(settings.homeGeo)
@@ -176,7 +178,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack }:
     <div className="flex-1 flex flex-col">
       {onBack && (
         <button onClick={onBack} className="px-4 pt-5 text-[13px] font-semibold text-accent text-left w-fit">
-          ‹ Back to Week
+          ‹ Back to {backLabel}
         </button>
       )}
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
