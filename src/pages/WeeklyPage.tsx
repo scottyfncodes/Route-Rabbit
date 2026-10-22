@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button'
 import { buildWeekRoutes, readWeekPlans, type WeekBuildSummary } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
 import { addDays, formatDateHeading, startOfWeek, todayStr } from '../lib/time'
+import { shortCondition } from '../lib/weather'
 import type { AppSettings } from '../types'
 import type { usePatients } from '../hooks/usePatients'
 
@@ -96,11 +97,11 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
 
         {!confirming && (
           <Button size="lg" fullWidth onClick={handleBuildWeek} disabled={activePatientCount === 0 || building}>
-            {building ? 'Building…' : '⚡ BUILD MY WEEK'}
+            {building ? 'Building…' : 'BUILD MY WEEK'}
           </Button>
         )}
         {activePatientCount === 0 && !confirming && (
-          <p className="text-[12.5px] text-muted text-center mt-2">Add active patients first -- each day is built from their available days.</p>
+          <p className="text-[12.5px] text-muted text-center mt-2">Add active patients first. Each day is built from their available days.</p>
         )}
       </div>
 
@@ -123,8 +124,8 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
               <div className="flex items-center gap-3 min-w-0">
                 {dayWeather && (
                   <div className="text-center shrink-0 w-9">
-                    <div className="text-[19px] leading-none">{dayWeather.icon}</div>
-                    <div className="text-[11px] text-muted font-semibold mt-0.5">{dayWeather.tempMaxF}°</div>
+                    <div className="text-[15px] font-bold text-ink leading-none">{dayWeather.tempMaxF}°</div>
+                    <div className={`text-[10.5px] font-semibold mt-1 ${dayWeather.impact > 0 ? 'text-warning' : 'text-muted'}`}>{shortCondition(dayWeather.label)}</div>
                   </div>
                 )}
                 <div className="min-w-0">
@@ -132,7 +133,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
                   <div className="text-[13px] text-muted">
                     {visitCount === 0 ? 'No visits planned' : `${visitCount} visit${visitCount === 1 ? '' : 's'}`}
                     {plan?.result && visitCount > 0 ? ` · ${plan.result.efficiency}% efficient` : ''}
-                    {hasConflicts ? ' · ⚠️ needs attention' : ''}
+                    {hasConflicts ? ' · needs attention' : ''}
                   </div>
                 </div>
               </div>

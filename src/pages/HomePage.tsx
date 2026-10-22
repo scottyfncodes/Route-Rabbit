@@ -72,7 +72,7 @@ export function HomePage({ settings, updateSettings, patientsApi, onNavigate, on
             <div className="min-w-0">
               <div className="text-[12px] font-bold text-label uppercase tracking-wide">Start location</div>
               <div className={`text-[14px] mt-0.5 truncate ${hasStart ? 'text-ink font-medium' : 'text-muted'}`}>
-                {hasStart ? settings.homeAddress : 'Not set yet -- used for drive times'}
+                {hasStart ? settings.homeAddress : 'Not set yet. Used for drive times.'}
               </div>
             </div>
             <button

@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { Button } from '../ui/Button'
 import type { MakeupCandidate } from '../../lib/makeup'
 import { formatTime } from '../../lib/time'
-import type { Patient, PatientPriority, Stop } from '../../types'
+import type { Patient, Stop } from '../../types'
+import { PriorityDot } from '../ui/PriorityDot'
 
-const PRIORITY_DOT: Record<PatientPriority, string> = { high: '🔴', medium: '🟡', low: '🟢' }
-const PRIORITY_LABEL: Record<PatientPriority, string> = { high: 'High priority', medium: 'Medium priority', low: 'Low priority' }
 
 interface Props {
   patient: Patient
@@ -54,9 +53,7 @@ export function CancelVisitModal({ patient, stop, candidates, onAddCandidate, on
                     <div key={c.id} className="bg-app rounded-2xl border border-line-soft px-4 py-3.5 flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span role="img" aria-label={PRIORITY_LABEL[c.priority]} title={PRIORITY_LABEL[c.priority]} className="text-[11px]">
-                            {PRIORITY_DOT[c.priority]}
-                          </span>
+                          <PriorityDot priority={c.priority} />
                           <span className="font-bold text-[15.5px] text-ink">{c.initials}</span>
                         </div>
                         <div className="text-[12.5px] text-muted truncate">

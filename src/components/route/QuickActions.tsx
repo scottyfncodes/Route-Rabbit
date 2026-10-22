@@ -6,10 +6,10 @@ interface Props {
   compact?: boolean
 }
 
-const ACTIONS: Array<{ key: 'coffee' | 'lunch' | 'parks'; icon: string; label: string }> = [
-  { key: 'coffee', icon: '☕', label: 'Coffee' },
-  { key: 'lunch', icon: '🍴', label: 'Lunch' },
-  { key: 'parks', icon: '🌳', label: 'Parks' },
+const ACTIONS: Array<{ key: 'coffee' | 'lunch' | 'parks'; label: string }> = [
+  { key: 'coffee', label: 'Coffee' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'parks', label: 'Parks' },
 ]
 
 export function QuickActions({ near, compact }: Props) {
@@ -22,11 +22,10 @@ export function QuickActions({ near, compact }: Props) {
           target="_blank"
           rel="noreferrer"
           role="button"
-          className={`flex flex-col items-center justify-center gap-1 rounded-2xl bg-surface border border-line-soft font-bold text-ink active:bg-mint-50 ${
-            compact ? 'py-3 text-[13px]' : 'py-4 text-[14px]'
+          className={`flex items-center justify-center rounded-2xl bg-surface border border-line-soft font-bold text-ink active:bg-mint-50 ${
+            compact ? 'py-3 text-[13px]' : 'py-3.5 text-[14px]'
           }`}
         >
-          <span className={compact ? 'text-[20px]' : 'text-[26px]'}>{a.icon}</span>
           {a.label}
         </a>
       ))}

@@ -5,45 +5,55 @@ const CACHE_KEY = 'weatherCache'
 const CACHE_TTL_MS = 20 * 60 * 1000 // 20 minutes -- weather doesn't need to be second-fresh
 
 interface CodeInfo {
-  icon: string
   label: string
   impact: WeatherImpact
 }
 
 /** WMO weather codes, as used by Open-Meteo's free forecast API. */
 const CODE_MAP: Record<number, CodeInfo> = {
-  0: { icon: '☀️', label: 'Clear', impact: 0 },
-  1: { icon: '🌤️', label: 'Mostly clear', impact: 0 },
-  2: { icon: '⛅', label: 'Partly cloudy', impact: 0 },
-  3: { icon: '☁️', label: 'Overcast', impact: 0 },
-  45: { icon: '🌫️', label: 'Fog', impact: 1 },
-  48: { icon: '🌫️', label: 'Freezing fog', impact: 1 },
-  51: { icon: '🌦️', label: 'Light drizzle', impact: 1 },
-  53: { icon: '🌦️', label: 'Drizzle', impact: 1 },
-  55: { icon: '🌦️', label: 'Heavy drizzle', impact: 1 },
-  56: { icon: '🌧️', label: 'Freezing drizzle', impact: 2 },
-  57: { icon: '🌧️', label: 'Freezing drizzle', impact: 2 },
-  61: { icon: '🌧️', label: 'Light rain', impact: 1 },
-  63: { icon: '🌧️', label: 'Rain', impact: 2 },
-  65: { icon: '🌧️', label: 'Heavy rain', impact: 2 },
-  66: { icon: '🌧️', label: 'Freezing rain', impact: 2 },
-  67: { icon: '🌧️', label: 'Freezing rain', impact: 2 },
-  71: { icon: '❄️', label: 'Light snow', impact: 1 },
-  73: { icon: '❄️', label: 'Snow', impact: 2 },
-  75: { icon: '❄️', label: 'Heavy snow', impact: 2 },
-  77: { icon: '❄️', label: 'Snow grains', impact: 1 },
-  80: { icon: '🌦️', label: 'Rain showers', impact: 1 },
-  81: { icon: '🌧️', label: 'Rain showers', impact: 2 },
-  82: { icon: '🌧️', label: 'Violent showers', impact: 2 },
-  85: { icon: '🌨️', label: 'Snow showers', impact: 2 },
-  86: { icon: '🌨️', label: 'Heavy snow showers', impact: 2 },
-  95: { icon: '⛈️', label: 'Thunderstorm', impact: 2 },
-  96: { icon: '⛈️', label: 'Thunderstorm w/ hail', impact: 2 },
-  99: { icon: '⛈️', label: 'Thunderstorm w/ hail', impact: 2 },
+  0: { label: 'Clear', impact: 0 },
+  1: { label: 'Mostly clear', impact: 0 },
+  2: { label: 'Partly cloudy', impact: 0 },
+  3: { label: 'Overcast', impact: 0 },
+  45: { label: 'Fog', impact: 1 },
+  48: { label: 'Freezing fog', impact: 1 },
+  51: { label: 'Light drizzle', impact: 1 },
+  53: { label: 'Drizzle', impact: 1 },
+  55: { label: 'Heavy drizzle', impact: 1 },
+  56: { label: 'Freezing drizzle', impact: 2 },
+  57: { label: 'Freezing drizzle', impact: 2 },
+  61: { label: 'Light rain', impact: 1 },
+  63: { label: 'Rain', impact: 2 },
+  65: { label: 'Heavy rain', impact: 2 },
+  66: { label: 'Freezing rain', impact: 2 },
+  67: { label: 'Freezing rain', impact: 2 },
+  71: { label: 'Light snow', impact: 1 },
+  73: { label: 'Snow', impact: 2 },
+  75: { label: 'Heavy snow', impact: 2 },
+  77: { label: 'Snow grains', impact: 1 },
+  80: { label: 'Rain showers', impact: 1 },
+  81: { label: 'Rain showers', impact: 2 },
+  82: { label: 'Violent showers', impact: 2 },
+  85: { label: 'Snow showers', impact: 2 },
+  86: { label: 'Heavy snow showers', impact: 2 },
+  95: { label: 'Thunderstorm', impact: 2 },
+  96: { label: 'Thunderstorm w/ hail', impact: 2 },
+  99: { label: 'Thunderstorm w/ hail', impact: 2 },
 }
 
 function codeInfo(code: number): CodeInfo {
-  return CODE_MAP[code] ?? { icon: '🌡️', label: 'Unknown', impact: 0 }
+  return CODE_MAP[code] ?? { label: 'Unknown', impact: 0 }
+}
+
+/** One-word condition for tight spots (forecast strip, week list), derived from the full label. */
+export function shortCondition(label: string): string {
+  if (/thunder/i.test(label)) return 'Storm'
+  if (/snow/i.test(label)) return 'Snow'
+  if (/rain|drizzle|shower/i.test(label)) return 'Rain'
+  if (/fog/i.test(label)) return 'Fog'
+  if (/overcast|cloudy/i.test(label)) return 'Cloudy'
+  if (/clear/i.test(label)) return 'Clear'
+  return ''
 }
 
 function cacheKeyFor(geo: GeoPoint): string {
@@ -52,8 +62,8 @@ function cacheKeyFor(geo: GeoPoint): string {
 
 /** Human-readable heads-up for a route built on a day with reduced-visibility/wet-road conditions. */
 export function weatherAdvisory(impact: WeatherImpact, label: string): string | null {
-  if (impact === 2) return `${label} in the forecast -- drive times increased for slower, wetter roads.`
-  if (impact === 1) return `${label} in the forecast -- drive times increased slightly.`
+  if (impact === 2) return `${label} in the forecast: drive times increased for slower, wetter roads.`
+  if (impact === 1) return `${label} in the forecast: drive times increased slightly.`
   return null
 }
 
@@ -91,7 +101,6 @@ export async function fetchWeather(geo: GeoPoint, options: { force?: boolean } =
     const currentInfo = codeInfo(data.current.weather_code)
     const current: CurrentWeather = {
       tempF: Math.round(data.current.temperature_2m),
-      icon: currentInfo.icon,
       label: currentInfo.label,
       impact: currentInfo.impact,
     }
@@ -104,7 +113,6 @@ export async function fetchWeather(geo: GeoPoint, options: { force?: boolean } =
         date,
         tempMaxF: Math.round(data.daily.temperature_2m_max[i]),
         tempMinF: Math.round(data.daily.temperature_2m_min[i]),
-        icon: info.icon,
         label: info.label,
         impact: info.impact,
       }

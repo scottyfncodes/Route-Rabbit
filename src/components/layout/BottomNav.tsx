@@ -1,4 +1,6 @@
+import type { ComponentType } from 'react'
 import { RabbitWheelIcon } from '../ui/RabbitWheelIcon'
+import { PatientsIcon, SettingsIcon, WeekIcon } from '../ui/NavIcons'
 
 export type Tab = 'today' | 'patients' | 'weekly' | 'settings'
 
@@ -7,11 +9,11 @@ interface Props {
   onChange: (tab: Tab) => void
 }
 
-const TABS: Array<{ key: Tab; label: string; icon: string }> = [
-  { key: 'today', label: 'Home', icon: '' },
-  { key: 'patients', label: 'Patients', icon: '🧑‍⚕️' },
-  { key: 'weekly', label: 'Weekly', icon: '📅' },
-  { key: 'settings', label: 'Settings', icon: '⚙️' },
+const TABS: Array<{ key: Tab; label: string; Icon: ComponentType<{ className?: string }> }> = [
+  { key: 'today', label: 'Home', Icon: RabbitWheelIcon },
+  { key: 'patients', label: 'Patients', Icon: PatientsIcon },
+  { key: 'weekly', label: 'Weekly', Icon: WeekIcon },
+  { key: 'settings', label: 'Settings', Icon: SettingsIcon },
 ]
 
 export function BottomNav({ active, onChange }: Props) {
@@ -28,11 +30,7 @@ export function BottomNav({ active, onChange }: Props) {
             active === tab.key ? 'text-accent' : 'text-faint'
           }`}
         >
-          {tab.key === 'today' ? (
-            <RabbitWheelIcon className="w-[22px] h-[22px]" />
-          ) : (
-            <span className="text-[20px] leading-none">{tab.icon}</span>
-          )}
+          <tab.Icon className="w-[22px] h-[22px]" />
           <span className={`text-[11px] ${active === tab.key ? 'font-bold' : 'font-medium'}`}>{tab.label}</span>
         </button>
       ))}

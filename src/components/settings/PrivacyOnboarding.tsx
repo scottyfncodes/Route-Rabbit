@@ -12,13 +12,13 @@ export function PrivacyOnboarding({ onDismiss }: Props) {
         <BrandMark className="w-12 h-12" />
         <h1 className="text-[22px] font-extrabold text-ink">Welcome to Route Rabbit</h1>
         <p className="text-[15px] text-ink leading-relaxed">
-          A fast route planner built for pediatric home-health therapists. Everything is stored locally on this device --
+          A fast route planner built for pediatric home-health therapists. Everything is stored locally on this device:
           there's no account and nothing is uploaded.
         </p>
         <div className="bg-mint-50 border border-mint-200 rounded-2xl px-4 py-3.5">
           <p className="text-[13.5px] text-ink leading-relaxed">
             <strong>This app is designed to store minimal scheduling information locally on your device. Do not enter
-            protected health information.</strong> Use patient initials only -- never full names, diagnoses, or medical
+            protected health information.</strong> Use patient initials only, never full names, diagnoses, or medical
             records.
           </p>
         </div>

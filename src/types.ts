@@ -123,14 +123,12 @@ export interface DayWeather {
   date: string // YYYY-MM-DD
   tempMaxF: number
   tempMinF: number
-  icon: string
   label: string
   impact: WeatherImpact
 }
 
 export interface CurrentWeather {
   tempF: number
-  icon: string
   label: string
   impact: WeatherImpact
 }

@@ -18,7 +18,7 @@ export function AddToHomeScreen() {
 
   return (
     <section className="bg-surface border-2 border-primary-400 rounded-2xl px-4 py-4">
-      <h2 className="text-[15px] font-bold text-ink mb-1.5">📲 Add to Home Screen</h2>
+      <h2 className="text-[15px] font-bold text-ink mb-1.5">Add to Home Screen</h2>
       {canInstall ? (
         <>
           <p className="text-[13.5px] text-muted mb-3">
@@ -31,7 +31,7 @@ export function AddToHomeScreen() {
       ) : (
         <p className="text-[13.5px] text-muted leading-relaxed">
           Tap <strong className="text-ink">Share</strong> in Safari's toolbar, then{' '}
-          <strong className="text-ink">Add to Home Screen</strong> -- it'll open full-screen like a real app, right from your
+          <strong className="text-ink">Add to Home Screen</strong>: it'll open full-screen like a real app, right from your
           lock screen.
         </p>
       )}

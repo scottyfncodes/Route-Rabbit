@@ -9,7 +9,7 @@ export function ConflictBanner({ conflicts, onEditRoute }: Props) {
   if (conflicts.length === 0) return null
   return (
     <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl px-4 py-3.5">
-      <div className="font-bold text-[15px] text-warning mb-1.5">⚠️ Schedule conflict</div>
+      <div className="font-bold text-[15px] text-warning mb-1.5">Schedule conflict</div>
       <ul className="space-y-1 mb-3">
         {conflicts.map((c, i) => (
           <li key={i} className="text-[13.5px] text-warning leading-snug">

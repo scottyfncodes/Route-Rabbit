@@ -1,4 +1,5 @@
 import { formatDateHeading, addDays, todayStr } from '../../lib/time'
+import { shortCondition } from '../../lib/weather'
 import type { WeatherForecast } from '../../types'
 
 interface Props {
@@ -25,12 +26,9 @@ export function WeatherWidget({ forecast, loading, hasLocation, onRefresh }: Pro
       {forecast ? (
         <>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-[38px] leading-none">{forecast.current.icon}</span>
-              <div>
-                <div className="text-[26px] font-extrabold text-ink leading-none">{forecast.current.tempF}°</div>
-                <div className="text-[13px] text-muted mt-0.5">{forecast.current.label}</div>
-              </div>
+            <div>
+              <div className="text-[26px] font-extrabold text-ink leading-none">{forecast.current.tempF}°</div>
+              <div className="text-[13px] text-muted mt-0.5">{forecast.current.label}</div>
             </div>
             <button onClick={onRefresh} className="text-[12px] font-semibold text-accent px-2 py-1" disabled={loading}>
               {loading ? '…' : '↻ Refresh'}
@@ -48,8 +46,8 @@ export function WeatherWidget({ forecast, loading, hasLocation, onRefresh }: Pro
               return (
                 <div key={date} className="text-center">
                   <div className="text-[11px] text-faint font-semibold uppercase">{formatDateHeading(date).slice(0, 3)}</div>
-                  <div className="text-[17px] leading-tight my-0.5">{day.icon}</div>
-                  <div className="text-[11.5px] text-muted">{day.tempMaxF}°</div>
+                  <div className="text-[15px] font-bold text-ink leading-tight mt-0.5">{day.tempMaxF}°</div>
+                  <div className={`text-[11.5px] ${day.impact > 0 ? 'text-warning font-semibold' : 'text-muted'}`}>{shortCondition(day.label)}</div>
                 </div>
               )
             })}

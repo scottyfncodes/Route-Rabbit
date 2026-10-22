@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { formatTime, toMinutes } from '../../lib/time'
 import { WEEKDAYS, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
+import { PriorityDot } from '../ui/PriorityDot'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
 const VISITS_PER_WEEK_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
-const PRIORITY_OPTIONS: Array<{ value: PatientPriority; label: string; dot: string }> = [
-  { value: 'high', label: 'High', dot: '🔴' },
-  { value: 'medium', label: 'Medium', dot: '🟡' },
-  { value: 'low', label: 'Low', dot: '🟢' },
+const PRIORITY_OPTIONS: Array<{ value: PatientPriority; label: string }> = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
 ]
 
 function newConflictId(): string {
@@ -91,7 +92,7 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
   const handleSubmit = () => {
     const initials = values.initials.trim().toUpperCase()
     if (!initials) return setError('Enter patient initials.')
-    if (initials.length > 4) return setError('Keep initials short (4 characters or fewer) -- no full names.')
+    if (initials.length > 4) return setError('Keep initials short (4 characters or fewer), no full names.')
     if (!values.address.trim()) return setError('Enter a home address.')
     if (values.availableDays.length === 0) return setError('Pick at least one available day.')
     if (values.windowStart >= values.windowEnd) return setError('End time must be after start time.')
@@ -118,7 +119,7 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
         {error && <div className="bg-coral-50 text-danger text-[14px] font-medium rounded-xl px-4 py-3">{error}</div>}
 
         <div>
-          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Initials only -- no names</label>
+          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Initials only, no names</label>
           <input
             autoFocus
             value={values.initials}
@@ -276,7 +277,7 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
                   values.priority === opt.value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
                 }`}
               >
-                <span>{opt.dot}</span>
+                <PriorityDot priority={opt.value} className={values.priority === opt.value ? 'ring-2 ring-white' : ''} />
                 {opt.label}
               </button>
             ))}
@@ -308,7 +309,7 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
             placeholder="e.g. use side door, parent prefers mornings"
             className="w-full text-[16px] bg-surface rounded-2xl border border-line px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
-          <p className="text-[12px] text-subtle mt-1.5">Scheduling logistics only -- never diagnoses, medical history, or PHI.</p>
+          <p className="text-[12px] text-subtle mt-1.5">Scheduling logistics only. Never diagnoses, medical history, or PHI.</p>
         </div>
 
         {onDelete && (

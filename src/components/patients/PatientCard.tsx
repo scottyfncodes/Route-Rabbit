@@ -1,8 +1,7 @@
-import type { Patient, PatientPriority } from '../../types'
+import type { Patient } from '../../types'
+import { PriorityDot } from '../ui/PriorityDot'
 import { formatDays, formatTime } from '../../lib/time'
 
-const PRIORITY_DOT: Record<PatientPriority, string> = { high: '🔴', medium: '🟡', low: '🟢' }
-const PRIORITY_LABEL: Record<PatientPriority, string> = { high: 'High priority', medium: 'Medium priority', low: 'Low priority' }
 
 interface Props {
   patient: Patient
@@ -20,14 +19,7 @@ export function PatientCard({ patient, onEdit, onToggleStatus }: Props) {
           <div className="w-12 h-12 rounded-full bg-primary-100 text-accent font-bold text-[16px] flex items-center justify-center tracking-wide">
             {patient.initials}
           </div>
-          <span
-            className="absolute -top-0.5 -right-0.5 text-[10px] leading-none"
-            role="img"
-            aria-label={PRIORITY_LABEL[patient.priority]}
-            title={PRIORITY_LABEL[patient.priority]}
-          >
-            {PRIORITY_DOT[patient.priority]}
-          </span>
+          <PriorityDot priority={patient.priority} className="absolute top-0 right-0 ring-2 ring-surface" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
