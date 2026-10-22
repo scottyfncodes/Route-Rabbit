@@ -216,8 +216,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
             <ConflictBanner conflicts={plan.result.conflicts} onEditRoute={() => setShowSetup(true)} />
 
             {plan.result.weatherNote && (
-              <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl px-4 py-3.5 flex items-start gap-2.5">
-                <span className="text-[18px] leading-none">🌦️</span>
+              <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl px-4 py-3.5">
                 <p className="text-[13.5px] text-warning leading-snug">{plan.result.weatherNote}</p>
               </div>
             )}
@@ -241,7 +240,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
             <div className="flex gap-2">
               <Button variant="danger" size="lg" fullWidth onClick={handleRebuild}>
-                🔄 REBUILD ROUTE
+                REBUILD ROUTE
               </Button>
             </div>
             <button onClick={() => setShowSetup(true)} className="w-full text-center text-[13.5px] font-semibold text-accent -mt-2">
@@ -258,7 +257,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
                 role="button"
                 className="block w-full text-center bg-primary-600 text-white font-extrabold text-[16px] rounded-2xl py-4 active:bg-primary-700"
               >
-                📍 OPEN ROUTE IN GOOGLE MAPS
+                OPEN ROUTE IN GOOGLE MAPS
               </a>
             )}
 

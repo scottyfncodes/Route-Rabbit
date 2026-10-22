@@ -59,7 +59,7 @@ export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient
 
       <div className="bg-surface rounded-2xl border border-line-soft px-4 py-4">
         <label className="flex items-center justify-between mb-1">
-          <span className="text-[15px] font-bold text-ink">🍴 Lunch / break</span>
+          <span className="text-[15px] font-bold text-ink">Lunch / break</span>
           <input
             type="checkbox"
             checked={plan.lunch.enabled}
@@ -148,7 +148,7 @@ export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient
 
       <div className="fixed left-0 right-0 bottom-16 max-w-[560px] mx-auto px-4">
         <Button size="lg" fullWidth disabled={selectedCount === 0} onClick={onBuild}>
-          🐰 BUILD MY ROUTE
+          BUILD MY ROUTE
         </Button>
       </div>
     </div>

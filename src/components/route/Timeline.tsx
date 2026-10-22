@@ -1,12 +1,13 @@
 import type { Patient, Stop } from '../../types'
 import { formatTimeShort } from '../../lib/time'
 
-const KIND_ICON: Record<Stop['kind'], string> = {
-  start: '🏠',
-  visit: '🟢',
-  lunch: '🍴',
-  open: '☕',
-  end: '🏁',
+/** Visits get a solid dot; start, end and breaks get a hollow ring (their cards are already dashed). */
+function StopMarker({ kind }: { kind: Stop['kind'] }) {
+  return kind === 'visit' ? (
+    <span className="w-3.5 h-3.5 rounded-full bg-primary-500 shrink-0" aria-hidden />
+  ) : (
+    <span className="w-3.5 h-3.5 rounded-full border-2 border-line-strong shrink-0" aria-hidden />
+  )
 }
 
 interface Props {
@@ -31,7 +32,7 @@ export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds =
             {idx > 0 && stop.driveMinutesFromPrev > 0 && (
               <div className="flex items-center gap-2 pl-6 py-1.5 text-[13px] text-muted">
                 <span className="w-px h-4 bg-line ml-[7px]" />
-                <span>🚗 {Math.round(stop.driveMinutesFromPrev)} min drive{stop.driveMilesFromPrev > 0 ? ` · ${stop.driveMilesFromPrev} mi` : ''}</span>
+                <span>{Math.round(stop.driveMinutesFromPrev)} min drive{stop.driveMilesFromPrev > 0 ? ` · ${stop.driveMilesFromPrev} mi` : ''}</span>
               </div>
             )}
             <div
@@ -39,7 +40,7 @@ export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds =
                 isActive ? 'border-primary-500 bg-mint-50' : stop.kind === 'visit' ? 'border-line-soft bg-surface' : 'border-dashed border-line bg-transparent'
               }`}
             >
-              <div className="text-[22px] leading-none shrink-0">{KIND_ICON[stop.kind]}</div>
+              <StopMarker kind={stop.kind} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-bold text-[15.5px] text-ink whitespace-nowrap shrink-0">
@@ -64,7 +65,7 @@ export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds =
                       isActive ? 'bg-primary-600 text-white' : 'bg-primary-50 text-accent'
                     }`}
                   >
-                    📍 I'm Here
+                    I'm Here
                   </button>
                   <button
                     onClick={() => onCancelPatient(patient.id)}

@@ -385,7 +385,7 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
       patientId: patient.id,
       message: hasConflictsToday
         ? `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd} on ${weekday}, minus their blocked times. The current route can't fit them in.`
-        : `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd}. The current route can't fit them in — try adjusting the day's start time or another patient's window.`,
+        : `${patient.initials} can only be seen ${patient.windowStart}–${patient.windowEnd}. The current route can't fit them in. Try adjusting the day's start time or another patient's window.`,
     })
   }
 

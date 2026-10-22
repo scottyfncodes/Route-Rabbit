@@ -85,7 +85,7 @@ export function PatientsPage({ patientsApi }: Props) {
               onClick={() => setArchiveOpen((v) => !v)}
               className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-line-soft bg-surface opacity-70 text-left"
             >
-              <div className="w-12 h-12 shrink-0 rounded-full bg-app text-subtle text-[20px] flex items-center justify-center">📁</div>
+              <div className="w-12 h-12 shrink-0 rounded-full bg-app text-subtle font-bold text-[16px] flex items-center justify-center">{archived.length}</div>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold text-[16px] text-ink">Archive</div>
                 <div className="text-[13px] text-muted">{archived.length} patients</div>

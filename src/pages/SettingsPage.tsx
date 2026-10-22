@@ -10,10 +10,10 @@ const SPEED_PRESETS: Array<{ label: string; value: number }> = [
   { label: 'Rural/highway', value: 38 },
 ]
 
-const THEME_PRESETS: Array<{ label: string; value: ThemeMode; icon: string }> = [
-  { label: 'Light', value: 'light', icon: '☀️' },
-  { label: 'Dark', value: 'dark', icon: '🌙' },
-  { label: 'System', value: 'system', icon: '⚙️' },
+const THEME_PRESETS: Array<{ label: string; value: ThemeMode }> = [
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+  { label: 'System', value: 'system' },
 ]
 
 interface Props {
@@ -48,11 +48,10 @@ export function SettingsPage({ settings, updateSettings }: Props) {
               <button
                 key={t.value}
                 onClick={() => updateSettings({ themeMode: t.value })}
-                className={`flex-1 py-3 rounded-xl text-[13px] font-semibold border-2 flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-3 rounded-xl text-[13px] font-semibold border-2 ${
                   settings.themeMode === t.value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
                 }`}
               >
-                <span>{t.icon}</span>
                 {t.label}
               </button>
             ))}
@@ -82,13 +81,13 @@ export function SettingsPage({ settings, updateSettings }: Props) {
         </section>
 
         <section className="bg-mint-50 border border-mint-200 rounded-2xl px-4 py-4">
-          <h2 className="text-[15px] font-bold text-accent mb-1.5">🔒 Privacy, by design</h2>
+          <h2 className="text-[15px] font-bold text-accent mb-1.5">Privacy, by design</h2>
           <p className="text-[13.5px] text-ink leading-relaxed">
             This app is designed to store minimal scheduling information locally on your device. Do not enter protected health
-            information. Patients are tracked by initials only -- no names, dates of birth, diagnoses, insurance, or medical
+            information. Patients are tracked by initials only: no names, dates of birth, diagnoses, insurance, or medical
             history. All data lives in your browser's local storage; nothing is sent to a server or cloud database. Addresses
-            are looked up via a free map service, and your start location's coordinates are sent to a free weather service --
-            neither ever receives patient initials or any other identifying information.
+            are looked up via a free map service, and your start location's coordinates are sent to a free weather service.
+            Neither ever receives patient initials or any other identifying information.
           </p>
         </section>
 

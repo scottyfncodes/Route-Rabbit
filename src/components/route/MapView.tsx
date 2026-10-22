@@ -7,11 +7,11 @@ interface Props {
 }
 
 const KIND_STYLE: Record<Stop['kind'], { bg: string; text: string }> = {
-  start: { bg: '#175650', text: '🏠' },
-  end: { bg: '#175650', text: '🏁' },
+  start: { bg: '#175650', text: 'S' },
+  end: { bg: '#175650', text: 'E' },
   visit: { bg: '#26827a', text: '' },
-  lunch: { bg: '#c94f3a', text: '🍴' },
-  open: { bg: '#b6790a', text: '☕' },
+  lunch: { bg: '#c94f3a', text: 'L' },
+  open: { bg: '#b6790a', text: '' },
 }
 
 function makeIcon(stop: Stop, sequenceNumber: number | null) {
