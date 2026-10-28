@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { AddToHomeScreen } from '../components/settings/AddToHomeScreen'
+import { BackupSection } from '../components/settings/BackupSection'
 import { removeStorage } from '../lib/storage'
 import type { AppSettings, ThemeMode } from '../types'
 
@@ -19,9 +20,11 @@ const THEME_PRESETS: Array<{ label: string; value: ThemeMode }> = [
 interface Props {
   settings: AppSettings
   updateSettings: (changes: Partial<AppSettings>) => void
+  restoreNotice: string | null
+  onRestored: (notice: string) => void
 }
 
-export function SettingsPage({ settings, updateSettings }: Props) {
+export function SettingsPage({ settings, updateSettings, restoreNotice, onRestored }: Props) {
   const [confirmingReset, setConfirmingReset] = useState(false)
 
   const handleReset = () => {
@@ -90,6 +93,8 @@ export function SettingsPage({ settings, updateSettings }: Props) {
             Neither ever receives patient initials or any other identifying information.
           </p>
         </section>
+
+        <BackupSection restoreNotice={restoreNotice} onRestored={onRestored} />
 
         <section>
           <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Data</h2>
