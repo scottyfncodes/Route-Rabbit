@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRoute, selectWeeklyDays, type RoutingInput } from './routing'
+import { buildRouteLinks } from './googleMaps'
 import { toMinutes } from './time'
 import type { GeoPoint, Patient, Stop } from '../types'
 
@@ -171,9 +172,10 @@ describe('buildRoute', () => {
     expect(clear.weatherNote).toBeNull()
   })
 
-  it('builds a Google Maps link only when there are visits', () => {
-    expect(buildRoute(input([])).googleMapsUrl).toBeNull()
-    expect(buildRoute(input([patient()])).googleMapsUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/dir\//)
+  it('builds Google Maps links only when there are visits', () => {
+    expect(buildRouteLinks(buildRoute(input([])).stops)).toEqual([])
+    const [link] = buildRouteLinks(buildRoute(input([patient()])).stops)
+    expect(link.url).toMatch(/^https:\/\/www\.google\.com\/maps\/dir\//)
   })
 
   it('finds a shorter loop than the greedy order for a zig-zag layout', () => {
@@ -189,6 +191,76 @@ describe('buildRoute', () => {
 
     const walked = buildRoute(input(ring))
     expect(result.totalMiles).toBeLessThanOrEqual(walked.totalMiles + 0.5)
+  })
+})
+
+describe('buildRoute when running late', () => {
+  it('plans the rest of the day from the resume time, keeping visited stops on their planned times', () => {
+    const a = patient({ geo: east(2) })
+    const b = patient({ geo: east(4) })
+    const c = patient({ geo: east(6) })
+    const onTime = buildRoute(input([a, b, c]))
+    const firstId = visitOrder(onTime.stops)[0]
+    const first = onTime.stops.find((s) => s.patientId === firstId)!
+
+    // Still at the first visit 40 minutes after it was planned to end.
+    const resumeAt = toMinutes(first.depart) + 40
+    const late = buildRoute(input([a, b, c], { lockedPatientIds: [firstId!], resumeAtMinutes: resumeAt }))
+    const lateFirst = late.stops.find((s) => s.patientId === firstId)!
+
+    expect(visitOrder(late.stops)[0]).toBe(firstId)
+    expect(lateFirst.arrive).toBe(first.arrive)
+    expect(toMinutes(lateFirst.depart)).toBe(resumeAt)
+    const rest = late.stops.filter((s) => s.kind === 'visit' && s.patientId !== firstId)
+    rest.forEach((s) => expect(toMinutes(s.arrive)).toBeGreaterThanOrEqual(resumeAt + s.driveMinutesFromPrev))
+    expectConsistentTimeline(late.stops)
+  })
+
+  it('reports a patient whose window has passed instead of scheduling them in the past', () => {
+    const early = patient({ windowStart: '08:00', windowEnd: '10:00' })
+    const result = buildRoute(input([early], { resumeAtMinutes: toMinutes('11:00') }))
+    expect(result.visitCount).toBe(0)
+    expect(result.conflicts.some((c) => c.patientId === early.id)).toBe(true)
+  })
+
+  it('does not put lunch in the past', () => {
+    const a = patient({ geo: east(2), visitDuration: 60 })
+    const result = buildRoute(
+      input([a], { resumeAtMinutes: toMinutes('12:15'), lunch: { enabled: true, earliest: '11:30', latest: '13:30', duration: 30 } }),
+    )
+    const lunch = result.stops.find((s) => s.kind === 'lunch')!
+    expect(toMinutes(lunch.arrive)).toBeGreaterThanOrEqual(toMinutes('12:15'))
+  })
+
+  it('changes nothing when the resume time is before the day starts', () => {
+    const ps = [patient(), patient()]
+    const strip = (stops: Stop[]) => stops.map((s) => [s.kind, s.patientId, s.arrive, s.depart])
+    expect(strip(buildRoute(input(ps, { resumeAtMinutes: toMinutes('07:00') })).stops)).toEqual(strip(buildRoute(input(ps)).stops))
+  })
+})
+
+describe('buildRouteLinks', () => {
+  it('uses typed addresses rather than geocoded coordinates', () => {
+    const [link] = buildRouteLinks(buildRoute(input([patient({ address: '12 Elm St, Denver, CO' })])).stops)
+    const params = new URL(link.url).searchParams
+    expect(params.get('waypoints')).toBe('12 Elm St, Denver, CO')
+    expect(params.get('origin')).toBe('home')
+  })
+
+  it('splits a day with more than nine visits into parts that chain together', () => {
+    const many = Array.from({ length: 12 }, () => patient({ visitDuration: 15 }))
+    const route = buildRoute(input(many))
+    expect(route.visitCount).toBe(12)
+    const links = buildRouteLinks(route.stops)
+    expect(links).toHaveLength(2)
+    const [first, second] = links.map((l) => new URL(l.url).searchParams)
+    expect(first.get('waypoints')!.split('|')).toHaveLength(9)
+    expect(second.get('origin')).toBe(first.get('destination'))
+    expect(second.get('destination')).toBe('home')
+    expect(links.map((l) => [l.firstVisit, l.lastVisit, l.endsAtDestination])).toEqual([
+      [1, 10, false],
+      [11, 12, true],
+    ])
   })
 })
 

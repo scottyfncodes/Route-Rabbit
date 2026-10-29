@@ -74,7 +74,6 @@ describe('summarizeDay', () => {
         visitCount: 2,
         efficiency: 70,
         conflicts: [],
-        googleMapsUrl: null,
         weatherNote: null,
       },
     })
@@ -108,7 +107,6 @@ describe('summarizeDay', () => {
         visitCount: 2,
         efficiency: 0,
         conflicts: [],
-        googleMapsUrl: null,
         weatherNote: null,
       },
     })

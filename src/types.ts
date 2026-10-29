@@ -94,7 +94,6 @@ export interface BuiltRoute {
   visitCount: number
   efficiency: number // 0-100
   conflicts: RouteConflict[]
-  googleMapsUrl: string | null
   weatherNote: string | null
 }
 

@@ -26,6 +26,25 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
   const today = todayStr()
   const activePatientCount = patients.filter((p) => p.status === 'active').length
 
+  // Estimated miles per built day, from the same leg estimates the router uses.
+  const mileage = days
+    .map((d) => ({ date: d, miles: plans[d]?.result && plans[d].result.visitCount > 0 ? plans[d].result.totalMiles : 0 }))
+    .filter((m) => m.miles > 0)
+  const totalMiles = Math.round(mileage.reduce((sum, m) => sum + m.miles, 0) * 10) / 10
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyMileage = async () => {
+    const lines = mileage.map((m) => `${formatDateHeading(m.date)}: ${m.miles} mi`)
+    lines.push(`Week total: ${totalMiles} mi (estimated)`)
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard blocked; the numbers are still on screen
+    }
+  }
+
   const totalVisits = days.reduce((sum, d) => {
     const plan = plans[d]
     if (!plan) return sum
@@ -51,14 +70,16 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
   return (
     <div className="flex-1 flex flex-col">
       <header className="px-4 pt-6 pb-3 flex items-center justify-between">
-        <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
+        <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week" className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
           ‹
         </button>
         <div className="text-center">
           <h1 className="text-[19px] font-extrabold text-ink">Week of {formatDateHeading(weekStart)}</h1>
-          <p className="text-[12.5px] text-muted">{totalVisits} visits planned</p>
+          <p className="text-[12.5px] text-muted">
+            {totalVisits} visits planned{totalMiles > 0 ? ` · about ${totalMiles} mi` : ''}
+          </p>
         </div>
-        <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
+        <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week" className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
           ›
         </button>
       </header>
@@ -141,6 +162,33 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
             </button>
           )
         })}
+
+        {mileage.length > 0 && (
+          <section className="bg-surface rounded-2xl border border-line-soft px-4 py-4 mt-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide">Mileage estimate</h2>
+              <button onClick={handleCopyMileage} className="text-[13.5px] font-bold text-accent px-2 py-1 -mr-2">
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <dl className="mt-1 divide-y divide-line-soft">
+              {mileage.map((m) => (
+                <div key={m.date} className="flex justify-between py-2 text-[14px]">
+                  <dt className="text-ink">{formatDateHeading(m.date)}</dt>
+                  <dd className="font-semibold text-ink tabular-nums">{m.miles} mi</dd>
+                </div>
+              ))}
+              <div className="flex justify-between py-2 text-[15px]">
+                <dt className="font-bold text-ink">Week total</dt>
+                <dd className="font-extrabold text-ink tabular-nums">{totalMiles} mi</dd>
+              </div>
+            </dl>
+            <p className="text-[12.5px] text-muted mt-1 leading-snug">
+              Estimated from each day's planned route, including the drive home. For reimbursement, check against your odometer
+              or Google Maps.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   )

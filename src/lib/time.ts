@@ -35,6 +35,12 @@ export function formatTimeShort(hhmm: string): string {
   return `${h12}:${String(m).padStart(2, '0')}`
 }
 
+/** Minutes since midnight right now, in the device's local time. */
+export function nowMinutes(): number {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
+}
+
 export function formatDuration(mins: number): string {
   const m = Math.round(mins)
   if (m < 60) return `${m} min`
