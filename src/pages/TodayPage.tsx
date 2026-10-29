@@ -12,7 +12,8 @@ import { useDayPlan } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
 import { buildRoute } from '../lib/routing'
 import { findMakeupCandidates } from '../lib/makeup'
-import { addDays, formatDateHeading, formatDuration, todayStr, weekdayOf } from '../lib/time'
+import { buildRouteLinks } from '../lib/googleMaps'
+import { addDays, formatDateHeading, formatDuration, formatTime, fromMinutes, nowMinutes, todayStr, toMinutes, weekdayOf } from '../lib/time'
 import type { AppSettings, BuiltRoute, Patient } from '../types'
 import type { usePatients } from '../hooks/usePatients'
 
@@ -30,6 +31,8 @@ interface Delta {
   driveMinutesSaved: number
   prevOrder: string
   newOrder: string
+  /** "HH:MM" the rest of today was re-planned from, when the rebuild caught up to the clock. */
+  resumedAt: string | null
 }
 
 export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, backLabel = 'Week' }: Props) {
@@ -67,6 +70,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
     patientIds: string[] = plan.patientIds,
     makeupIds: string[] = plan.makeupPatientIds,
     lockedIds: string[] = [],
+    resumeAtMinutes?: number,
   ): BuiltRoute => {
     const dayPatients = patientIds
       .filter((id) => !cancelledIds.includes(id))
@@ -87,8 +91,19 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
       weatherLabel: dayWeather?.label,
       makeupPatientIds: makeupIds,
       lockedPatientIds: lockedIds.filter((id) => !cancelledIds.includes(id)),
+      resumeAtMinutes,
     })
   }
+
+  /**
+   * On today's route, a rebuild re-plans what's left from the current time, so running
+   * long at one visit pushes the rest back instead of assuming the day is still on time.
+   */
+  const resumeAt = (): number | undefined => (date === todayStr() ? nowMinutes() : undefined)
+
+  /** The resume time worth calling out: only when it actually moved the day later than planned. */
+  const resumedLabel = (resume: number | undefined): string | null =>
+    resume !== undefined && resume > toMinutes(plan.dayStartTime) ? fromMinutes(resume) : null
 
   const orderLabel = (result: BuiltRoute) => result.stops.filter((s) => s.kind === 'visit').map((s) => s.label).join(' → ')
 
@@ -101,13 +116,15 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
   const rebuildWithCancelled = (cancelledIds: string[]) => {
     const prevResult = plan.result
-    const result = computeResult(cancelledIds, plan.patientIds, plan.makeupPatientIds, visitedPatientIds())
+    const resume = resumeAt()
+    const result = computeResult(cancelledIds, plan.patientIds, plan.makeupPatientIds, visitedPatientIds(), resume)
     updatePlan({ cancelledPatientIds: cancelledIds, result })
     if (prevResult) {
       setDelta({
         driveMinutesSaved: prevResult.totalDriveMinutes - result.totalDriveMinutes,
         prevOrder: orderLabel(prevResult),
         newOrder: orderLabel(result),
+        resumedAt: resumedLabel(resume),
       })
     }
   }
@@ -132,13 +149,15 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
     const newCancelled = plan.cancelledPatientIds.includes(cancelledId) ? plan.cancelledPatientIds : [...plan.cancelledPatientIds, cancelledId]
     const newPatientIds = plan.patientIds.includes(makeupId) ? plan.patientIds : [...plan.patientIds, makeupId]
     const newMakeupIds = plan.makeupPatientIds.includes(makeupId) ? plan.makeupPatientIds : [...plan.makeupPatientIds, makeupId]
-    const result = computeResult(newCancelled, newPatientIds, newMakeupIds, visitedPatientIds())
+    const resume = resumeAt()
+    const result = computeResult(newCancelled, newPatientIds, newMakeupIds, visitedPatientIds(), resume)
     updatePlan({ cancelledPatientIds: newCancelled, patientIds: newPatientIds, makeupPatientIds: newMakeupIds, result })
     if (prevResult) {
       setDelta({
         driveMinutesSaved: prevResult.totalDriveMinutes - result.totalDriveMinutes,
         prevOrder: orderLabel(prevResult),
         newOrder: orderLabel(result),
+        resumedAt: resumedLabel(resume),
       })
     }
     setCancelTargetId(null)
@@ -154,6 +173,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
   const activeIdx = stops.findIndex((s) => s.id === plan.activeStopId)
   const nextStop = stops.slice(activeIdx + 1).find((s) => s.kind === 'visit')
   const currentLocation = plan.currentLocationOverride ?? plan.startLocation
+  const routeLinks = buildRouteLinks(stops)
 
   const canGoNext = date < addDays(todayStr(), 90)
 
@@ -225,6 +245,9 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
               <div className="bg-mint-50 border-2 border-mint-200 rounded-2xl px-4 py-3.5">
                 <div className="font-bold text-[15px] text-accent mb-0.5">Route rebuilt</div>
                 <div className="text-[14px] text-ink mb-1">{delta.newOrder || 'No visits remain'}</div>
+                {delta.resumedAt && (
+                  <div className="text-[13px] text-muted mb-1">Rest of the day planned from {formatTime(delta.resumedAt)}, the current time.</div>
+                )}
                 {delta.driveMinutesSaved !== 0 && (
                   <div className="text-[13.5px] font-semibold text-accent">
                     {delta.driveMinutesSaved > 0
@@ -249,17 +272,24 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
             <StatsBar result={plan.result} />
 
-            {plan.result.googleMapsUrl && (
+            {routeLinks.length > 1 && (
+              <p className="text-[13px] text-muted -mb-2">
+                Google Maps limits how many stops one route can hold, so today opens in {routeLinks.length} parts. Start the next part when you
+                finish the last one.
+              </p>
+            )}
+            {routeLinks.map((link, i) => (
               <a
-                href={plan.result.googleMapsUrl}
+                key={link.url}
+                href={link.url}
                 target="_blank"
                 rel="noreferrer"
                 role="button"
                 className="block w-full text-center bg-primary-600 text-white font-extrabold text-[16px] rounded-2xl py-4 active:bg-primary-700"
               >
-                OPEN ROUTE IN GOOGLE MAPS
+                {routeLinks.length === 1 ? 'OPEN ROUTE IN GOOGLE MAPS' : `PART ${i + 1}: VISITS ${link.firstVisit}-${link.lastVisit}${link.endsAtDestination ? ' + END' : ''}`}
               </a>
-            )}
+            ))}
 
             {nextStop && <NextStopCard nextStop={nextStop} currentLocation={currentLocation} />}
 

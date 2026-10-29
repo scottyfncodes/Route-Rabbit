@@ -31,7 +31,8 @@ change mid-day.
   overview.
 - **Rebuild Route.** Cancel a visit mid-day and rebuild in seconds -- new order,
   new times, new drive estimate, with the time saved shown clearly. Visits up to
-  the stop you've marked "I'm Here" stay put; only the rest of the day is re-planned.
+  the stop you've marked "I'm Here" stay put; only the rest of the day is re-planned,
+  starting from the current time, so a visit that ran long pushes the rest of the day back.
 - **Cancellation + make-up visits.** Cancelling a visit walks you through finding a
   replacement: ranked make-up candidates (High/Medium/Low scheduling priority first,
   then least added drive time) who are marked available for make-up visits, fit the
@@ -40,7 +41,13 @@ change mid-day.
   status; a chosen replacement becomes a real, persisted stop on the route (labeled
   "Make-up"), even on a day they aren't normally scheduled.
 - **Open in Google Maps.** One tap opens a multi-stop driving-directions link with
-  the optimized stop order. Navigation itself always happens in Google Maps.
+  the optimized stop order, using each patient's typed address. Days with more
+  stops than one Google Maps link can hold open in parts. Navigation itself always
+  happens in Google Maps.
+- **Works with no signal.** Once opened, the app is cached on the device, so the
+  day's route, timeline, and "I'm Here" keep working offline.
+- **Weekly mileage estimate.** The Weekly tab totals each built day's estimated
+  miles, with a Copy button for a mileage log.
 - **Context-aware Coffee / Lunch / Parks.** Search nearby places around wherever
   you currently are (or the patient you just tapped "I'm Here" on) -- no
   copy/pasting addresses. Available on the Home dashboard and on each day's

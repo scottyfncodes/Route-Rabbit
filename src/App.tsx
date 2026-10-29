@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { usePatients } from './hooks/usePatients'
 import { useSettings } from './hooks/useSettings'
 import { useTheme } from './hooks/useTheme'
+import { useOnline } from './hooks/useOnline'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('today')
@@ -17,6 +18,7 @@ export default function App() {
   const patientsApi = usePatients()
   const { settings, updateSettings } = useSettings()
   useTheme(settings.themeMode)
+  const online = useOnline()
 
   const handleTabChange = (t: Tab) => {
     setDayView(null)
@@ -26,6 +28,12 @@ export default function App() {
   return (
     <>
       {!settings.onboardingSeen && <PrivacyOnboarding onDismiss={() => updateSettings({ onboardingSeen: true })} />}
+
+      {!online && (
+        <div role="status" className="bg-amber-50 border-b border-amber-100 px-4 py-2 text-[12.5px] text-warning leading-snug" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
+          No signal. Your routes and patients still work. Maps, weather, and new addresses load when you're back online.
+        </div>
+      )}
 
       {dayView ? (
         <TodayPage

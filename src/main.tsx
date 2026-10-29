@@ -9,3 +9,12 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// Keep the app openable with no signal (see public/sw.js). Skipped in dev so Vite's hot reload isn't cached.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // unsupported or blocked (e.g. private browsing); the app still works online
+    })
+  })
+}
