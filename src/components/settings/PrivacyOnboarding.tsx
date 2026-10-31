@@ -13,7 +13,7 @@ export function PrivacyOnboarding({ onDismiss }: Props) {
         <h1 className="text-[22px] font-extrabold text-ink">Welcome to Route Rabbit</h1>
         <p className="text-[15px] text-ink leading-relaxed">
           A fast route planner built for pediatric home-health therapists. Everything is stored locally on this device:
-          there's no account and nothing is uploaded.
+          there's no account and your patient list is never uploaded.
         </p>
         <div className="bg-mint-50 border border-mint-200 rounded-2xl px-4 py-3.5">
           <p className="text-[13.5px] text-ink leading-relaxed">

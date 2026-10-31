@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#175650" />
+    <title>Route Rabbit has moved</title>
+    <style>
+      :root { --bg: #f5f6f4; --surface: #ffffff; --ink: #132825; --muted: #5b6e6a; --line: #dfe5e3; --primary: #1a6a63; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #0c1413; --surface: #15211f; --ink: #edf4f2; --muted: #9db0ac; --line: #26332f; --primary: #2a8a81; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; }
+      main { max-width: 480px; margin: 0 auto; padding: 48px 16px; }
+      h1 { font-size: 24px; font-weight: 800; margin: 0 0 8px; }
+      p { font-size: 15px; line-height: 1.5; margin: 0 0 14px; }
+      .muted { color: var(--muted); font-size: 13.5px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 16px; margin: 20px 0; }
+      .btn { display: block; width: 100%; text-align: center; font: inherit; font-weight: 800; font-size: 16px; padding: 15px; border-radius: 16px; text-decoration: none; cursor: pointer; border: 2px solid var(--primary); }
+      .primary { background: var(--primary); color: #fff; }
+      .outline { background: transparent; color: var(--primary); margin-top: 10px; }
+      ol { padding-left: 20px; margin: 0; font-size: 14.5px; line-height: 1.55; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Route Rabbit has moved</h1>
+      <p>The app now lives at <strong>route-rabbit.vercel.app</strong>, where real drive times and better address lookup work.</p>
+
+      <div id="has-data" class="card" hidden>
+        <p><strong>Your patients are saved on this phone at the old address.</strong> Bring them along in two steps:</p>
+        <ol>
+          <li>Tap <strong>Save backup file</strong> below and keep the file (Save to Files works).</li>
+          <li>Open the new address, go to <strong>Settings</strong>, tap <strong>Restore from a file</strong>, and pick that file.</li>
+        </ol>
+        <p class="muted" id="summary" style="margin-top: 12px"></p>
+        <button id="save" class="btn primary">Save backup file</button>
+        <a class="btn outline" href="https://route-rabbit.vercel.app/">Open the new Route Rabbit</a>
+        <p class="muted" style="margin-top: 14px">If you added the old app to your home screen, add the new one too, then remove the old icon.</p>
+      </div>
+
+      <div id="no-data" hidden>
+        <a class="btn primary" href="https://route-rabbit.vercel.app/">Open Route Rabbit</a>
+        <p class="muted" style="margin-top: 12px">Taking you there now.</p>
+      </div>
+    </main>
+    <script>
+      // Same file format as the app's own backup (src/lib/backup.ts), so Restore accepts it.
+      (function () {
+        var NEW_URL = 'https://route-rabbit.vercel.app/';
+        function read(key) {
+          try {
+            var raw = localStorage.getItem('routeRabbit:' + key);
+            return raw == null ? undefined : JSON.parse(raw);
+          } catch (e) {
+            return undefined;
+          }
+        }
+        var patients = read('patients');
+        var dayPlans = read('dayPlans');
+        var settings = read('settings');
+        var hasData = Array.isArray(patients) && patients.length > 0;
+
+        // Retire the old offline copy so it can't keep opening a stale app.
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) { regs.forEach(function (r) { r.unregister(); }); });
+        }
+
+        if (!hasData) {
+          document.getElementById('no-data').hidden = false;
+          setTimeout(function () { window.location.replace(NEW_URL); }, 1200);
+          return;
+        }
+
+        document.getElementById('has-data').hidden = false;
+        var days = dayPlans && typeof dayPlans === 'object' ? Object.keys(dayPlans).length : 0;
+        document.getElementById('summary').textContent =
+          patients.length + ' patient' + (patients.length === 1 ? '' : 's') + ' and ' + days + ' planned day' + (days === 1 ? '' : 's') + ' found on this phone.';
+
+        document.getElementById('save').addEventListener('click', function () {
+          var now = new Date();
+          var backup = {
+            app: 'route-rabbit',
+            version: 1,
+            exportedAt: now.toISOString(),
+            data: {
+              patients: patients,
+              dayPlans: dayPlans && typeof dayPlans === 'object' && !Array.isArray(dayPlans) ? dayPlans : {},
+              settings: settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}
+            }
+          };
+          var pad = function (n) { return String(n).padStart(2, '0'); };
+          var name = 'route-rabbit-backup-' + now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + '.json';
+          var file = new File([JSON.stringify(backup, null, 2)], name, { type: 'application/json' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: 'Route Rabbit backup' }).catch(function () {});
+            return;
+          }
+          var url = URL.createObjectURL(file);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        });
+      })();
+    </script>
+  </body>
+</html>

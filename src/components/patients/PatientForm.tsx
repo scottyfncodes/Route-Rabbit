@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { lookupAddress } from '../../lib/geocode'
 import { formatTime, toMinutes } from '../../lib/time'
-import { WEEKDAYS, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
+import { WEEKDAYS, type GeoPoint, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
 import { PriorityDot } from '../ui/PriorityDot'
+import { PinPicker } from './PinPicker'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
 const VISITS_PER_WEEK_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
@@ -27,6 +29,10 @@ export interface PatientFormValues {
   notes: string
   priority: PatientPriority
   makeupAvailable: boolean
+  geo: GeoPoint | null
+  matchedAddress: string | null
+  geoExact: boolean
+  geoConfirmed: boolean
 }
 
 function valuesFrom(patient?: Patient): PatientFormValues {
@@ -43,6 +49,10 @@ function valuesFrom(patient?: Patient): PatientFormValues {
       notes: '',
       priority: 'medium',
       makeupAvailable: false,
+      geo: null,
+      matchedAddress: null,
+      geoExact: false,
+      geoConfirmed: false,
     }
   }
   return {
@@ -57,6 +67,10 @@ function valuesFrom(patient?: Patient): PatientFormValues {
     notes: patient.notes ?? '',
     priority: patient.priority,
     makeupAvailable: patient.makeupAvailable,
+    geo: patient.geo,
+    matchedAddress: patient.matchedAddress ?? null,
+    geoExact: patient.geoExact ?? false,
+    geoConfirmed: patient.geoConfirmed ?? false,
   }
 }
 
@@ -65,10 +79,17 @@ interface Props {
   onSave: (values: PatientFormValues) => void
   onCancel: () => void
   onDelete?: () => void
+  /** Where to drop a hand-placed pin when the address can't be found at all. */
+  fallbackCenter?: GeoPoint | null
 }
 
-export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
+type LookupState = 'idle' | 'looking' | 'notFound'
+
+export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCenter }: Props) {
   const [values, setValues] = useState<PatientFormValues>(() => valuesFrom(patient))
+  // The address text the current pin belongs to. Editing the address clears the pin.
+  const [pinFor, setPinFor] = useState<string | null>(() => (patient?.geo ? patient.address : null))
+  const [lookup, setLookup] = useState<LookupState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [conflictDay, setConflictDay] = useState<Weekday>('Mon')
   const [conflictStart, setConflictStart] = useState('12:00')
@@ -86,6 +107,41 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
     setError(null)
     set('conflicts', [...values.conflicts, { id: newConflictId(), day: conflictDay, startTime: conflictStart, endTime: conflictEnd }])
   }
+
+  const setAddress = (address: string) => {
+    setValues((prev) =>
+      address.trim() === (pinFor ?? '').trim()
+        ? { ...prev, address }
+        : { ...prev, address, geo: null, matchedAddress: null, geoExact: false, geoConfirmed: false },
+    )
+    setLookup('idle')
+  }
+
+  const findOnMap = async () => {
+    const address = values.address.trim()
+    if (!address) return setError('Enter a home address.')
+    setError(null)
+    setLookup('looking')
+    const match = await lookupAddress(address)
+    setPinFor(values.address)
+    if (!match) {
+      setLookup('notFound')
+      return
+    }
+    setLookup('idle')
+    setValues((prev) => ({ ...prev, geo: match.geo, matchedAddress: match.matchedAddress, geoExact: match.exact, geoConfirmed: false }))
+  }
+
+  const placeByHand = () => {
+    if (!fallbackCenter) return
+    setPinFor(values.address)
+    setLookup('idle')
+    setValues((prev) => ({ ...prev, geo: fallbackCenter, matchedAddress: null, geoExact: false, geoConfirmed: false }))
+  }
+
+  const movePin = useCallback((geo: GeoPoint) => {
+    setValues((prev) => ({ ...prev, geo, geoConfirmed: true }))
+  }, [])
 
   const removeConflict = (id: string) => set('conflicts', values.conflicts.filter((c) => c.id !== id))
 
@@ -132,12 +188,65 @@ export function PatientForm({ patient, onSave, onCancel, onDelete }: Props) {
 
         <div>
           <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Home address</label>
-          <input
-            value={values.address}
-            onChange={(e) => set('address', e.target.value)}
-            placeholder="123 Main St, Springfield, IL"
-            className="w-full text-[16px] bg-surface rounded-2xl border border-line px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
-          />
+          <div className="flex gap-2">
+            <input
+              value={values.address}
+              onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') findOnMap()
+              }}
+              placeholder="123 Main St, Denver, CO"
+              className="flex-1 min-w-0 text-[16px] bg-surface rounded-2xl border border-line px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+            {!values.geo && (
+              <button
+                onClick={findOnMap}
+                disabled={lookup === 'looking' || !values.address.trim()}
+                className="shrink-0 px-4 rounded-2xl bg-primary-600 text-white font-bold text-[14px] disabled:opacity-50"
+              >
+                {lookup === 'looking' ? 'Finding' : 'Find'}
+              </button>
+            )}
+          </div>
+
+          {lookup === 'notFound' && (
+            <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-3 text-[13px] text-warning leading-snug">
+              Couldn't find that address. Check the spelling and include the city and state.
+              {fallbackCenter && (
+                <button onClick={placeByHand} className="block mt-1.5 font-bold text-accent">
+                  Place the pin by hand
+                </button>
+              )}
+            </div>
+          )}
+
+          {values.geo && (
+            <div className="mt-2.5 space-y-2">
+              <div className="bg-surface rounded-xl border border-line-soft px-3.5 py-3">
+                <div className="text-[11.5px] font-bold text-label uppercase tracking-wide">Map match</div>
+                <div className="text-[14px] text-ink leading-snug mt-0.5">{values.matchedAddress ?? 'Pin placed by hand'}</div>
+                {!values.geoConfirmed && !values.geoExact && values.matchedAddress && (
+                  <p className="text-[12.5px] text-warning mt-1 leading-snug">
+                    Close, but not matched to the exact house. Drag the pin onto the right home.
+                  </p>
+                )}
+              </div>
+              <PinPicker key={pinFor ?? 'pin'} geo={values.geo} onMove={movePin} />
+              {values.geoConfirmed ? (
+                <p className="text-[12.5px] text-accent font-semibold">Pin confirmed. Drive times use this spot.</p>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[12.5px] text-muted leading-snug">Drag the pin if it isn't on the house.</p>
+                  <button
+                    onClick={() => set('geoConfirmed', true)}
+                    className="shrink-0 text-[13px] font-bold text-accent bg-primary-50 rounded-full px-3 py-1.5"
+                  >
+                    Pin is right
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div>

@@ -12,9 +12,11 @@ interface Props {
   onUpdatePlan: (changes: Partial<DayPlan>) => void
   onTogglePatient: (id: string) => void
   onBuild: () => void
+  /** True while real drive times are loading for the build. */
+  building?: boolean
 }
 
-export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient, onBuild }: Props) {
+export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient, onBuild, building = false }: Props) {
   const selectedCount = plan.patientIds.filter((id) => availableToday.some((p) => p.id === id)).length
   const [sameAsStart, setSameAsStart] = useState(
     () => plan.endLocation.address === plan.startLocation.address && plan.startLocation.address !== '',
@@ -147,8 +149,8 @@ export function RouteSetup({ plan, availableToday, onUpdatePlan, onTogglePatient
       </div>
 
       <div className="fixed left-0 right-0 bottom-16 max-w-[560px] mx-auto px-4">
-        <Button size="lg" fullWidth disabled={selectedCount === 0} onClick={onBuild}>
-          BUILD MY ROUTE
+        <Button size="lg" fullWidth disabled={selectedCount === 0 || building} onClick={onBuild}>
+          {building ? 'GETTING DRIVE TIMES…' : 'BUILD MY ROUTE'}
         </Button>
       </div>
     </div>

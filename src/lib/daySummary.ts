@@ -5,6 +5,8 @@ export interface DayVisit {
   initials: string
   arrive: string // "HH:MM"
   driveMinutesFromPrev: number
+  /** True when this leg is the offline estimate rather than a real road time. */
+  driveEstimated?: boolean
 }
 
 export interface DaySummary {
@@ -31,6 +33,7 @@ export function summarizeDay(plan: DayPlan | undefined, patientsById: Map<string
       initials: (s.patientId && patientsById.get(s.patientId)?.initials) || s.label,
       arrive: s.arrive,
       driveMinutesFromPrev: Math.round(s.driveMinutesFromPrev),
+      driveEstimated: s.driveSource !== 'road',
     }))
 
   return {

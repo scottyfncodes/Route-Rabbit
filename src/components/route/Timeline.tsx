@@ -32,7 +32,14 @@ export function Timeline({ stops, patientsById, activeStopId, makeupPatientIds =
             {idx > 0 && stop.driveMinutesFromPrev > 0 && (
               <div className="flex items-center gap-2 pl-6 py-1.5 text-[13px] text-muted">
                 <span className="w-px h-4 bg-line ml-[7px]" />
-                <span>{Math.round(stop.driveMinutesFromPrev)} min drive{stop.driveMilesFromPrev > 0 ? ` · ${stop.driveMilesFromPrev} mi` : ''}</span>
+                <span>
+                  {Math.round(stop.driveMinutesFromPrev)} min drive{stop.driveMilesFromPrev > 0 ? ` · ${stop.driveMilesFromPrev} mi` : ''}
+                </span>
+                {stop.driveSource !== 'road' && (
+                  <span className="text-[11px] font-bold text-warning bg-amber-50 rounded-full px-1.5 py-px" title="Estimated, not a real road time">
+                    est.
+                  </span>
+                )}
               </div>
             )}
             <div

@@ -81,8 +81,8 @@ describe('summarizeDay', () => {
     const summary = summarizeDay(built, patientsById)
     expect(summary).toEqual({
       visits: [
-        { initials: 'J.M.', arrive: '08:14', driveMinutesFromPrev: 14 },
-        { initials: 'A.R.', arrive: '12:20', driveMinutesFromPrev: 20 },
+        { initials: 'J.M.', arrive: '08:14', driveMinutesFromPrev: 14, driveEstimated: true },
+        { initials: 'A.R.', arrive: '12:20', driveMinutesFromPrev: 20, driveEstimated: true },
       ],
       visitCount: 2,
       totalDriveMinutes: 48,

@@ -56,7 +56,7 @@ export default function App() {
               onOpenDay={setDayView}
             />
           )}
-          {tab === 'patients' && <PatientsPage patientsApi={patientsApi} />}
+          {tab === 'patients' && <PatientsPage patientsApi={patientsApi} homeGeo={settings.homeGeo} />}
           {tab === 'weekly' && <WeeklyPage onSelectDate={setDayView} patientsApi={patientsApi} settings={settings} />}
           {tab === 'settings' && <SettingsPage settings={settings} updateSettings={updateSettings} />}
         </>
