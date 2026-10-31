@@ -1,9 +1,21 @@
-name: Deploy to GitHub Pages
+name: Retire GitHub Pages
+
+# Route Rabbit's only production home is Vercel (https://route-rabbit.vercel.app),
+# where the api/ functions run. The app is no longer built for GitHub Pages.
+#
+# This publishes a small "moved" page to the old Pages address instead. It lets anyone
+# who used the old address save a backup of the patients stored there (browser storage
+# is per address, so it doesn't follow them automatically), then sends them to Vercel.
+# Once nobody uses the old address, turn Pages off in the repo's Settings > Pages and
+# delete this file.
 
 on:
   push:
     branches:
       - claude/pediatric-route-planner-wobvs6
+    paths:
+      - pages-moved/**
+      - .github/workflows/deploy-pages.yml
   workflow_dispatch:
 
 permissions:
@@ -16,39 +28,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload build output
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload the moved notice
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-moved
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

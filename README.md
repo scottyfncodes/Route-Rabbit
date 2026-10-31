@@ -1,5 +1,7 @@
 # Route Rabbit
 
+Live: **https://route-rabbit.vercel.app**
+
 A free, mobile-first route planner built for pediatric home-health therapists who
 travel between patient homes all day. It plans the day, then hands off to Google
 Maps for actual turn-by-turn navigation.
@@ -46,8 +48,18 @@ change mid-day.
   happens in Google Maps.
 - **Works with no signal.** Once opened, the app is cached on the device, so the
   day's route, timeline, and "I'm Here" keep working offline.
-- **Weekly mileage estimate.** The Weekly tab totals each built day's estimated
-  miles, with a Copy button for a mileage log.
+- **Real drive times.** Drive times and miles come from Google's road routing,
+  with typical traffic for the day and time of each leg (a 3 PM leg gets 3 PM
+  traffic). They drive route building, the weekly build, make-up ranking, and
+  mileage. With no signal, the app falls back to a straight-line estimate and
+  marks every guessed leg "est." so a guessed schedule is never mistaken for a real one.
+- **Weekly mileage.** The Weekly tab totals each built day's road miles, with a
+  Copy button for a mileage log.
+- **Addresses you can check.** Addresses are matched through Google Geocoding. The
+  patient form shows the address it matched and a map pin you can drag onto the
+  right house.
+- **Backup to a file.** Settings > Backup saves everything to a file and restores
+  from one. Home shows a gentle reminder once a week. No cloud account.
 - **Context-aware Coffee / Lunch / Parks.** Search nearby places around wherever
   you currently are (or the patient you just tapped "I'm Here" on) -- no
   copy/pasting addresses. Available on the Home dashboard and on each day's
@@ -57,16 +69,44 @@ change mid-day.
 ## Privacy
 
 Everything lives in the browser's local storage on your device. There's no
-account, no server, and no cloud database. Patients are identified by initials
-only -- the app is deliberately not built to hold PHI.
+account and no cloud database. Patients are identified by initials only -- the
+app is deliberately not built to hold PHI.
+
+Two small server functions talk to Google so the API key never reaches the phone:
+
+- `api/drive-times.ts` receives only latitude/longitude pairs and a departure time.
+  It rebuilds the request from those numbers alone before calling Google Routes.
+- `api/geocode.ts` receives only the street address text (in a POST body, never a
+  URL). No initials, names, or notes are accepted.
+
+Patient initials and notes never leave the device.
 
 ## Stack
 
 React + TypeScript + Vite, Tailwind CSS v4, Leaflet/OpenStreetMap for the map
-view, OpenStreetMap's free Nominatim service for geocoding addresses (cached
-locally), and Open-Meteo's free forecast API for weather (no API key for
-either). Drive times are estimated from geocoded coordinates rather than a
-paid routing API -- Google Maps handles the real navigation.
+view, Open-Meteo's free forecast API for weather, and Vercel serverless functions
+for Google Routes (drive times), Google Geocoding (addresses), and the COtrip road
+feed. Nominatim is a fallback geocoder when the server lookup is unavailable.
+Google Maps handles turn-by-turn navigation.
+
+## Deploying
+
+Vercel is the only production home (`route-rabbit.vercel.app`), deployed from the
+`claude/pediatric-route-planner-wobvs6` branch. Environment variables in Vercel:
+
+- `GOOGLE_ROUTES_API_KEY`: a Google Maps Platform key with **Routes API** and
+  **Geocoding API** enabled. Set a daily quota on it in Google Cloud.
+- `COTRIP_API_KEY`: the CDOT COtrip key.
+
+Without the Google key the app still works: drive times are estimated (and labeled
+that way) and addresses fall back to Nominatim.
+
+Drive times are cached on the device per leg, weekday, and hour for 30 days, so
+rebuilding a day or a week that was built before costs no API calls. A day's
+build is one distance matrix plus one small request per departure hour.
+
+The old GitHub Pages address now shows a "moved" page (`pages-moved/`) that lets
+anyone with data saved there download a backup file before switching.
 
 ## Getting started
 

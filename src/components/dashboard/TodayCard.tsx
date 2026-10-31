@@ -54,7 +54,9 @@ export function TodayCard({ date, summary, example, hasPatients, onOpenDay, onAd
                 <span className="font-bold text-[15px] text-ink w-[76px] shrink-0 tabular-nums">{formatTime(v.arrive)}</span>
                 <span className="font-semibold text-[15px] text-ink truncate flex-1">{v.initials}</span>
                 {v.driveMinutesFromPrev > 0 && (
-                  <span className="text-[12.5px] text-muted shrink-0">{v.driveMinutesFromPrev} min drive</span>
+                  <span className="text-[12.5px] text-muted shrink-0">
+                    {v.driveMinutesFromPrev} min drive{v.driveEstimated ? ' (est.)' : ''}
+                  </span>
                 )}
               </li>
             ))}

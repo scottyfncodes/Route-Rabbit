@@ -25,6 +25,12 @@ export interface Patient {
   initials: string
   address: string
   geo: GeoPoint | null
+  /** The address the geocoder actually matched (or "Pin placed by hand"), shown so the therapist can confirm it. */
+  matchedAddress?: string | null
+  /** True once the therapist has looked at the pin and confirmed it, or dragged it into place. */
+  geoConfirmed?: boolean
+  /** True when the geocoder matched the exact house (not just the street, ZIP, or town). */
+  geoExact?: boolean
   visitDuration: number // minutes
   availableDays: Weekday[]
   windowStart: string // "HH:MM" 24h
@@ -69,6 +75,9 @@ export interface DayPlan {
   result: BuiltRoute | null
 }
 
+/** Where a drive time came from: real road routing with traffic, or the offline straight-line estimate. */
+export type DriveSource = 'road' | 'estimate'
+
 export type StopKind = 'start' | 'visit' | 'lunch' | 'open' | 'end'
 
 export interface Stop {
@@ -80,6 +89,8 @@ export interface Stop {
   depart: string // "HH:MM"
   driveMinutesFromPrev: number
   driveMilesFromPrev: number
+  /** Set on every stop reached by driving. Missing on routes built before real drive times existed (those were all estimates). */
+  driveSource?: DriveSource
   geo: GeoPoint | null
   address?: string
 }
@@ -95,6 +106,10 @@ export interface BuiltRoute {
   efficiency: number // 0-100
   conflicts: RouteConflict[]
   weatherNote: string | null
+  /** How many driving legs used the offline estimate instead of real road times. Missing on older routes = all estimated. */
+  estimatedLegCount?: number
+  /** Total driving legs in the route. */
+  legCount?: number
 }
 
 export interface RouteConflict {

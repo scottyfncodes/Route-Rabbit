@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { geocodeAddress } from '../../lib/geocode'
+import { lookupAddress } from '../../lib/geocode'
 import type { NamedLocation } from '../../types'
 
 interface Props {
@@ -19,6 +19,8 @@ export function LocationInput({ label, value, onChange, placeholder }: Props) {
   const [text, setText] = useState(value.address)
   const [syncedAddress, setSyncedAddress] = useState(value.address)
   const [locating, setLocating] = useState(false)
+  // What the map service matched on the last save, so a wrong match is visible right away.
+  const [matched, setMatched] = useState<{ text: string; exact: boolean } | 'none' | null>(null)
 
   // Pick up address changes made elsewhere (e.g. switching days) without an effect round-trip.
   if (value.address !== syncedAddress) {
@@ -35,9 +37,10 @@ export function LocationInput({ label, value, onChange, placeholder }: Props) {
       return
     }
     setLocating(true)
-    const geo = await geocodeAddress(text)
+    const match = await lookupAddress(text)
     setLocating(false)
-    onChange({ ...value, address: text, geo })
+    setMatched(match ? { text: match.matchedAddress, exact: match.exact } : 'none')
+    onChange({ ...value, address: text, geo: match?.geo ?? null })
   }
 
   return (
@@ -66,6 +69,15 @@ export function LocationInput({ label, value, onChange, placeholder }: Props) {
           </button>
         )}
       </div>
+      {matched === 'none' && (
+        <p className="text-[12.5px] text-warning mt-1.5 leading-snug">Couldn't find that address. Include the city and state.</p>
+      )}
+      {matched && matched !== 'none' && !dirty && (
+        <p className="text-[12.5px] text-muted mt-1.5 leading-snug">
+          Found: <span className="text-ink">{matched.text}</span>
+          {!matched.exact && <span className="text-warning"> (approximate, check it)</span>}
+        </p>
+      )}
     </div>
   )
 }

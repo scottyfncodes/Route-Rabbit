@@ -2,15 +2,17 @@ import { useState } from 'react'
 import { PatientCard } from '../components/patients/PatientCard'
 import { PatientForm, type PatientFormValues } from '../components/patients/PatientForm'
 import type { usePatients } from '../hooks/usePatients'
-import type { Patient } from '../types'
+import type { GeoPoint, Patient } from '../types'
 
 interface Props {
   patientsApi: ReturnType<typeof usePatients>
+  /** The day's start location, used as a starting point for a hand-placed pin. */
+  homeGeo?: GeoPoint | null
 }
 
 const byInitials = (a: Patient, b: Patient) => a.initials.localeCompare(b.initials)
 
-export function PatientsPage({ patientsApi }: Props) {
+export function PatientsPage({ patientsApi, homeGeo }: Props) {
   const { patients, addPatient, updatePatient, removePatient, setStatus } = patientsApi
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
@@ -106,6 +108,7 @@ export function PatientsPage({ patientsApi }: Props) {
           onSave={handleSave}
           onCancel={() => setEditing(null)}
           onDelete={editing !== 'new' ? handleDelete : undefined}
+          fallbackCenter={homeGeo}
         />
       )}
     </div>

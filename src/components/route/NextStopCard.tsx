@@ -14,7 +14,7 @@ export function NextStopCard({ nextStop, currentLocation }: Props) {
         <div className="text-[12px] font-bold uppercase tracking-wider text-white/75">Next stop</div>
         <div className="text-[26px] font-extrabold leading-tight">{nextStop.label}</div>
         {nextStop.driveMinutesFromPrev > 0 && (
-          <div className="text-[14.5px] text-white/75 font-medium">{Math.round(nextStop.driveMinutesFromPrev)} min away</div>
+          <div className="text-[14.5px] text-white/75 font-medium">{Math.round(nextStop.driveMinutesFromPrev)} min away{nextStop.driveSource !== 'road' ? ' (estimated)' : ''}</div>
         )}
       </div>
       <a

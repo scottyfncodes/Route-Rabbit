@@ -26,16 +26,21 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
   const today = todayStr()
   const activePatientCount = patients.filter((p) => p.status === 'active').length
 
-  // Estimated miles per built day, from the same leg estimates the router uses.
+  // Miles per built day, from the same legs the router drove: real road miles, or the estimate where those weren't available.
   const mileage = days
-    .map((d) => ({ date: d, miles: plans[d]?.result && plans[d].result.visitCount > 0 ? plans[d].result.totalMiles : 0 }))
+    .map((d) => {
+      const result = plans[d]?.result
+      const built = result && result.visitCount > 0
+      return { date: d, miles: built ? result.totalMiles : 0, estimated: built ? (result.estimatedLegCount ?? 1) > 0 : false }
+    })
     .filter((m) => m.miles > 0)
+  const anyEstimated = mileage.some((m) => m.estimated)
   const totalMiles = Math.round(mileage.reduce((sum, m) => sum + m.miles, 0) * 10) / 10
   const [copied, setCopied] = useState(false)
 
   const handleCopyMileage = async () => {
-    const lines = mileage.map((m) => `${formatDateHeading(m.date)}: ${m.miles} mi`)
-    lines.push(`Week total: ${totalMiles} mi (estimated)`)
+    const lines = mileage.map((m) => `${formatDateHeading(m.date)}: ${m.miles} mi${m.estimated ? ' (estimated)' : ''}`)
+    lines.push(`Week total: ${totalMiles} mi${anyEstimated ? ' (includes estimates)' : ''}`)
     try {
       await navigator.clipboard.writeText(lines.join('\n'))
       setCopied(true)
@@ -59,11 +64,14 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
     setBuilding(true)
     setConfirming(false)
     // let the "Building..." state paint before the (synchronous) optimizer runs
-    window.setTimeout(() => {
-      const result = buildWeekRoutes(weekStart, patients, settings, weather?.daily)
-      setSummary(result)
-      setPlans(readWeekPlans())
-      setBuilding(false)
+    window.setTimeout(async () => {
+      try {
+        const result = await buildWeekRoutes(weekStart, patients, settings, weather?.daily)
+        setSummary(result)
+        setPlans(readWeekPlans())
+      } finally {
+        setBuilding(false)
+      }
     }, 30)
   }
 
@@ -76,7 +84,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
         <div className="text-center">
           <h1 className="text-[19px] font-extrabold text-ink">Week of {formatDateHeading(weekStart)}</h1>
           <p className="text-[12.5px] text-muted">
-            {totalVisits} visits planned{totalMiles > 0 ? ` · about ${totalMiles} mi` : ''}
+            {totalVisits} visits planned{totalMiles > 0 ? ` · ${anyEstimated ? 'about ' : ''}${totalMiles} mi` : ''}
           </p>
         </div>
         <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week" className="w-9 h-9 flex items-center justify-center text-[20px] text-accent">
@@ -92,6 +100,12 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
               {summary.totalVisits} visit{summary.totalVisits === 1 ? '' : 's'} across {summary.daysBuilt} days
               {summary.daysWithConflicts > 0 ? ` · ${summary.daysWithConflicts} day${summary.daysWithConflicts === 1 ? '' : 's'} need attention` : ''}
             </div>
+            {summary.estimatedLegs > 0 && (
+              <p className="text-[13px] text-warning mt-1 leading-snug">
+                Real road times couldn't be loaded for {summary.estimatedLegs} drive{summary.estimatedLegs === 1 ? '' : 's'}, so those are
+                estimated. Build again when you have signal.
+              </p>
+            )}
             <button onClick={() => setSummary(null)} className="text-[12px] text-muted mt-1.5 font-medium">
               Dismiss
             </button>
@@ -118,7 +132,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
 
         {!confirming && (
           <Button size="lg" fullWidth onClick={handleBuildWeek} disabled={activePatientCount === 0 || building}>
-            {building ? 'Building…' : 'BUILD MY WEEK'}
+            {building ? 'GETTING DRIVE TIMES…' : 'BUILD MY WEEK'}
           </Button>
         )}
         {activePatientCount === 0 && !confirming && (
@@ -166,7 +180,7 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
         {mileage.length > 0 && (
           <section className="bg-surface rounded-2xl border border-line-soft px-4 py-4 mt-4">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide">Mileage estimate</h2>
+              <h2 className="text-[13px] font-bold text-label uppercase tracking-wide">Mileage</h2>
               <button onClick={handleCopyMileage} className="text-[13.5px] font-bold text-accent px-2 py-1 -mr-2">
                 {copied ? 'Copied' : 'Copy'}
               </button>
@@ -175,7 +189,9 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
               {mileage.map((m) => (
                 <div key={m.date} className="flex justify-between py-2 text-[14px]">
                   <dt className="text-ink">{formatDateHeading(m.date)}</dt>
-                  <dd className="font-semibold text-ink tabular-nums">{m.miles} mi</dd>
+                  <dd className="font-semibold text-ink tabular-nums">
+                    {m.miles} mi{m.estimated && <span className="text-[11px] font-bold text-warning ml-1.5">est.</span>}
+                  </dd>
                 </div>
               ))}
               <div className="flex justify-between py-2 text-[15px]">
@@ -184,8 +200,9 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
               </div>
             </dl>
             <p className="text-[12.5px] text-muted mt-1 leading-snug">
-              Estimated from each day's planned route, including the drive home. For reimbursement, check against your odometer
-              or Google Maps.
+              {anyEstimated
+                ? 'Road miles for each planned route, including the drive home. Days marked est. were built without a connection and use a straight-line estimate; rebuild them for road miles.'
+                : "Road miles for each day's planned route, including the drive home, from Google's driving directions. Detours and missed turns aren't counted, so check your odometer for reimbursement."}
             </p>
           </section>
         )}

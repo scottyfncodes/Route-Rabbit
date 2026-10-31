@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { AddToHomeScreen } from '../components/settings/AddToHomeScreen'
+import { BackupSection } from '../components/settings/BackupSection'
 import { removeStorage } from '../lib/storage'
 import type { AppSettings, ThemeMode } from '../types'
 
@@ -29,6 +30,9 @@ export function SettingsPage({ settings, updateSettings }: Props) {
     removeStorage('dayPlans')
     removeStorage('settings')
     removeStorage('geocodeCache')
+    removeStorage('addressCache')
+    removeStorage('driveTimeCache')
+    removeStorage('backupMeta')
     window.location.reload()
   }
 
@@ -77,7 +81,9 @@ export function SettingsPage({ settings, updateSettings }: Props) {
               </button>
             ))}
           </div>
-          <p className="text-[12.5px] text-muted mt-1.5">Used to estimate drive times between visits when building your route.</p>
+          <p className="text-[12.5px] text-muted mt-1.5">
+            Only used when real road times can't be loaded (no signal), to estimate the drive between visits.
+          </p>
         </section>
 
         <section className="bg-mint-50 border border-mint-200 rounded-2xl px-4 py-4">
@@ -85,11 +91,14 @@ export function SettingsPage({ settings, updateSettings }: Props) {
           <p className="text-[13.5px] text-ink leading-relaxed">
             This app is designed to store minimal scheduling information locally on your device. Do not enter protected health
             information. Patients are tracked by initials only: no names, dates of birth, diagnoses, insurance, or medical
-            history. All data lives in your browser's local storage; nothing is sent to a server or cloud database. Addresses
-            are looked up via a free map service, and your start location's coordinates are sent to a free weather service.
-            Neither ever receives patient initials or any other identifying information.
+            history. All data lives in your browser's local storage, with no account and no cloud database. To find an address
+            on the map, only the street address is sent to Google. To get drive times, only map coordinates and the time of
+            day are sent. Your start location's coordinates go to a free weather service. None of them ever receive patient
+            initials, notes, or anything else about the patient.
           </p>
         </section>
+
+        <BackupSection />
 
         <section>
           <h2 className="text-[13px] font-bold text-label uppercase tracking-wide mb-2">Data</h2>

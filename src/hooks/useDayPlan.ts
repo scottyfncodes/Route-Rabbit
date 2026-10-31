@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
-import { buildRoute, selectWeeklyDays } from '../lib/routing'
+import { selectWeeklyDays } from '../lib/routing'
+import { planRoute } from '../lib/planRoute'
 import { addDays, weekdayOf } from '../lib/time'
 import type { AppSettings, DayPlan, DayWeather, Patient } from '../types'
 
@@ -98,6 +99,8 @@ export interface WeekBuildSummary {
   daysBuilt: number
   totalVisits: number
   daysWithConflicts: number
+  /** Driving legs across the week that fell back to the estimate. */
+  estimatedLegs: number
 }
 
 /**
@@ -107,16 +110,17 @@ export interface WeekBuildSummary {
  * preferences (falling back to defaults for days with no saved plan yet), but
  * replaces that day's patient selection and result outright.
  */
-export function buildWeekRoutes(
+export async function buildWeekRoutes(
   weekStart: string,
   patients: Patient[],
   settings: AppSettings,
   dailyWeather?: Record<string, DayWeather>,
-): WeekBuildSummary {
+): Promise<WeekBuildSummary> {
   const map = readStorage<DayPlanMap>(KEY, {})
   let totalVisits = 0
   let daysWithConflicts = 0
   let daysBuilt = 0
+  let estimatedLegs = 0
 
   // Pin each patient's actual visit days for the whole week up front, so a
   // visitsPerWeek cap picks the same specific weekdays across every day's
@@ -130,7 +134,8 @@ export function buildWeekRoutes(
     const dayPatients = patients.filter((p) => p.status === 'active' && (weeklyDaysByPatient.get(p.id) ?? []).includes(weekday))
     const weather = dailyWeather?.[date]
 
-    const result = buildRoute({
+    // One day at a time: each day's drive times come from its own date, and most legs repeat (and hit the cache) day to day.
+    const result = await planRoute({
       date,
       dayStartTime: existing.dayStartTime,
       startLocation: existing.startLocation,
@@ -155,8 +160,9 @@ export function buildWeekRoutes(
     daysBuilt += 1
     totalVisits += result.visitCount
     if (result.conflicts.length > 0) daysWithConflicts += 1
+    estimatedLegs += result.estimatedLegCount ?? 0
   }
 
   writeStorage(KEY, map)
-  return { daysBuilt, totalVisits, daysWithConflicts }
+  return { daysBuilt, totalVisits, daysWithConflicts, estimatedLegs }
 }

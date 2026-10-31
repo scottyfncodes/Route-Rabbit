@@ -4,6 +4,7 @@ import { WeatherWidget } from '../components/dashboard/WeatherWidget'
 import { LocationInput } from '../components/route/LocationInput'
 import { QuickActions } from '../components/route/QuickActions'
 import { BrandMark } from '../components/ui/BrandMark'
+import { BackupReminder } from '../components/settings/BackupReminder'
 import { useWeather } from '../hooks/useWeather'
 import { readWeekPlans } from '../hooks/useDayPlan'
 import { EXAMPLE_DAY, summarizeDay } from '../lib/daySummary'
@@ -66,6 +67,8 @@ export function HomePage({ settings, updateSettings, patientsApi, onNavigate, on
           onOpenDay={() => onOpenDay(today)}
           onAddPatient={() => onNavigate('patients')}
         />
+
+        <BackupReminder patientCount={patientsApi.patients.length} />
 
         <div className="bg-surface rounded-2xl border border-line-soft px-4 py-3.5 space-y-3">
           <div className="flex items-center justify-between gap-3">

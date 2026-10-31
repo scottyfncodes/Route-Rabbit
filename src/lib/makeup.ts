@@ -1,11 +1,14 @@
 import type { GeoPoint, Patient, PatientPriority, Weekday } from '../types'
-import { estimateLeg } from './distance'
+import type { RoadLeg } from './driveTimes'
+import { legFunction, type LegFn } from './routing'
 import { toMinutes } from './time'
 
 export interface MakeupCandidate {
   patient: Patient
   /** Extra one-way drive minutes this candidate adds if slotted between the route's existing neighbors here. Null when geography is unknown. */
   extraDriveMinutes: number | null
+  /** True when any leg behind that number is the offline estimate rather than a real road time. */
+  driveEstimated: boolean
 }
 
 export interface FindMakeupCandidatesInput {
@@ -22,6 +25,8 @@ export interface FindMakeupCandidatesInput {
   /** The route's stop immediately after the opening, if any. */
   nextStopGeo: GeoPoint | null
   avgSpeedMph: number
+  /** Real road legs where cached; anything missing falls back to the estimate. */
+  roadLeg?: (from: GeoPoint, to: GeoPoint, departMinutes: number) => RoadLeg | null
 }
 
 const PRIORITY_RANK: Record<PatientPriority, number> = { high: 0, medium: 1, low: 2 }
@@ -44,12 +49,22 @@ function fitsSlot(patient: Patient, weekday: Weekday, slotStart: number, slotEnd
 }
 
 /** Extra one-way driving this candidate would add versus the route just going straight from prev to next. */
-function routeImpactMinutes(candidateGeo: GeoPoint | null, prevGeo: GeoPoint | null, nextGeo: GeoPoint | null, avgSpeedMph: number): number | null {
-  if (!candidateGeo) return null
-  const inLeg = prevGeo ? estimateLeg(prevGeo, candidateGeo, avgSpeedMph).minutes : 0
-  const outLeg = nextGeo ? estimateLeg(candidateGeo, nextGeo, avgSpeedMph).minutes : 0
-  const baseline = prevGeo && nextGeo ? estimateLeg(prevGeo, nextGeo, avgSpeedMph).minutes : 0
-  return Math.max(0, inLeg + outLeg - baseline)
+function routeImpact(
+  candidate: Patient,
+  prevGeo: GeoPoint | null,
+  nextGeo: GeoPoint | null,
+  slotStart: number,
+  leg: LegFn,
+): { extraDriveMinutes: number | null; driveEstimated: boolean } {
+  const candidateGeo = candidate.geo
+  if (!candidateGeo) return { extraDriveMinutes: null, driveEstimated: false }
+  const legs = [
+    prevGeo ? { l: leg(prevGeo, candidateGeo, slotStart), sign: 1 } : null,
+    nextGeo ? { l: leg(candidateGeo, nextGeo, slotStart + candidate.visitDuration), sign: 1 } : null,
+    prevGeo && nextGeo ? { l: leg(prevGeo, nextGeo, slotStart), sign: -1 } : null,
+  ].filter((x): x is { l: ReturnType<LegFn>; sign: number } => x !== null)
+  const extra = legs.reduce((sum, { l, sign }) => sum + sign * l.minutes, 0)
+  return { extraDriveMinutes: Math.max(0, extra), driveEstimated: legs.some(({ l }) => l.source === 'estimate') }
 }
 
 /**
@@ -67,6 +82,7 @@ function routeImpactMinutes(candidateGeo: GeoPoint | null, prevGeo: GeoPoint | n
  */
 export function findMakeupCandidates(input: FindMakeupCandidatesInput): MakeupCandidate[] {
   const { cancelledPatientId, weekday, slotStart, slotEnd, allPatients, scheduledPatientIdsToday, prevStopGeo, nextStopGeo, avgSpeedMph } = input
+  const leg = legFunction(avgSpeedMph, 1, input.roadLeg)
   const start = toMinutes(slotStart)
   const end = toMinutes(slotEnd)
   const scheduledSet = new Set(scheduledPatientIdsToday)
@@ -78,7 +94,7 @@ export function findMakeupCandidates(input: FindMakeupCandidatesInput): MakeupCa
     .filter((p) => !scheduledSet.has(p.id))
     .filter((p) => p.geo !== null) // the router can't place an address it couldn't locate
     .filter((p) => fitsSlot(p, weekday, start, end))
-    .map((patient) => ({ patient, extraDriveMinutes: routeImpactMinutes(patient.geo, prevStopGeo, nextStopGeo, avgSpeedMph) }))
+    .map((patient) => ({ patient, ...routeImpact(patient, prevStopGeo, nextStopGeo, start, leg) }))
 
   candidates.sort((a, b) => {
     const rankDiff = PRIORITY_RANK[a.patient.priority] - PRIORITY_RANK[b.patient.priority]

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { RouteSetup } from '../components/route/RouteSetup'
 import { Timeline } from '../components/route/Timeline'
@@ -10,7 +10,9 @@ import { NextStopCard } from '../components/route/NextStopCard'
 import { CancelVisitModal } from '../components/route/CancelVisitModal'
 import { useDayPlan } from '../hooks/useDayPlan'
 import { useWeather } from '../hooks/useWeather'
-import { buildRoute } from '../lib/routing'
+import { planRoute } from '../lib/planRoute'
+import { fetchRoadLegs, roadLegLookup } from '../lib/driveTimes'
+import { DriveTimeNotice } from '../components/route/DriveTimeNotice'
 import { findMakeupCandidates } from '../lib/makeup'
 import { buildRouteLinks } from '../lib/googleMaps'
 import { addDays, formatDateHeading, formatDuration, formatTime, fromMinutes, nowMinutes, todayStr, toMinutes, weekdayOf } from '../lib/time'
@@ -42,6 +44,9 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
   const [showSetup, setShowSetup] = useState(!plan.result)
   const [delta, setDelta] = useState<Delta | null>(null)
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null)
+  const [building, setBuilding] = useState(false)
+  // Bumped when real drive times for make-up candidates arrive, so the list re-ranks with them.
+  const [legsVersion, setLegsVersion] = useState(0)
 
   const weekday = weekdayOf(date)
   const patientsById = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
@@ -71,7 +76,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
     makeupIds: string[] = plan.makeupPatientIds,
     lockedIds: string[] = [],
     resumeAtMinutes?: number,
-  ): BuiltRoute => {
+  ): Promise<BuiltRoute> => {
     const dayPatients = patientIds
       .filter((id) => !cancelledIds.includes(id))
       .map((id) => patientsById.get(id))
@@ -79,7 +84,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
     const dayWeather = weather?.daily[date]
 
-    return buildRoute({
+    return planRoute({
       date,
       dayStartTime: plan.dayStartTime,
       startLocation: plan.startLocation,
@@ -107,17 +112,30 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
   const orderLabel = (result: BuiltRoute) => result.stops.filter((s) => s.kind === 'visit').map((s) => s.label).join(' → ')
 
-  const handleBuild = () => {
-    const result = computeResult(plan.cancelledPatientIds)
-    updatePlan({ result, activeStopId: null, currentLocationOverride: null })
-    setDelta(null)
-    setShowSetup(false)
+  /** Runs one route build at a time, with the buttons showing it's working while real drive times load. */
+  const whileBuilding = async (work: () => Promise<void>) => {
+    if (building) return
+    setBuilding(true)
+    try {
+      await work()
+    } finally {
+      setBuilding(false)
+    }
   }
 
-  const rebuildWithCancelled = (cancelledIds: string[]) => {
+  const handleBuild = () =>
+    whileBuilding(async () => {
+      const result = await computeResult(plan.cancelledPatientIds)
+      updatePlan({ result, activeStopId: null, currentLocationOverride: null })
+      setDelta(null)
+      setShowSetup(false)
+    })
+
+  const rebuildWithCancelled = (cancelledIds: string[]) =>
+    whileBuilding(async () => {
     const prevResult = plan.result
     const resume = resumeAt()
-    const result = computeResult(cancelledIds, plan.patientIds, plan.makeupPatientIds, visitedPatientIds(), resume)
+    const result = await computeResult(cancelledIds, plan.patientIds, plan.makeupPatientIds, visitedPatientIds(), resume)
     updatePlan({ cancelledPatientIds: cancelledIds, result })
     if (prevResult) {
       setDelta({
@@ -127,7 +145,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
         resumedAt: resumedLabel(resume),
       })
     }
-  }
+    })
 
   const handleRebuild = () => rebuildWithCancelled(plan.cancelledPatientIds)
   const handleCancelPatient = (patientId: string) => {
@@ -144,13 +162,14 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
     setCancelTargetId(null)
   }
 
-  const handleAddMakeup = (cancelledId: string, makeupId: string) => {
+  const handleAddMakeup = (cancelledId: string, makeupId: string) =>
+    whileBuilding(async () => {
     const prevResult = plan.result
     const newCancelled = plan.cancelledPatientIds.includes(cancelledId) ? plan.cancelledPatientIds : [...plan.cancelledPatientIds, cancelledId]
     const newPatientIds = plan.patientIds.includes(makeupId) ? plan.patientIds : [...plan.patientIds, makeupId]
     const newMakeupIds = plan.makeupPatientIds.includes(makeupId) ? plan.makeupPatientIds : [...plan.makeupPatientIds, makeupId]
     const resume = resumeAt()
-    const result = computeResult(newCancelled, newPatientIds, newMakeupIds, visitedPatientIds(), resume)
+    const result = await computeResult(newCancelled, newPatientIds, newMakeupIds, visitedPatientIds(), resume)
     updatePlan({ cancelledPatientIds: newCancelled, patientIds: newPatientIds, makeupPatientIds: newMakeupIds, result })
     if (prevResult) {
       setDelta({
@@ -161,7 +180,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
       })
     }
     setCancelTargetId(null)
-  }
+    })
 
   const handleImHere = (stopId: string) => {
     const stop = plan.result?.stops.find((s) => s.id === stopId)
@@ -179,6 +198,36 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
 
   const cancelTargetPatient = cancelTargetId ? patientsById.get(cancelTargetId) : undefined
   const cancelTargetStop = cancelTargetId ? stops.find((s) => s.patientId === cancelTargetId) : undefined
+  const cancelIdx = cancelTargetStop ? stops.indexOf(cancelTargetStop) : -1
+  const slotPrevGeo = cancelIdx > 0 ? (stops[cancelIdx - 1]?.geo ?? null) : null
+  const slotNextGeo = cancelIdx >= 0 ? (stops[cancelIdx + 1]?.geo ?? null) : null
+
+  // When a slot opens, fetch real drive times for each possible make-up (in and out of the
+  // gap) at the slot's time, then re-rank. One small request; cached after that.
+  const cancelSlotKey = cancelTargetStop ? `${cancelTargetStop.id}@${cancelTargetStop.arrive}` : null
+  useEffect(() => {
+    if (!cancelSlotKey || !cancelTargetStop || !cancelTargetId) return
+    const slotStart = toMinutes(cancelTargetStop.arrive)
+    const requests = patients
+      .filter((p) => p.id !== cancelTargetId && p.status === 'active' && p.makeupAvailable && p.geo)
+      .flatMap((p) => [
+        ...(slotPrevGeo ? [{ from: slotPrevGeo, to: p.geo!, departMinutes: slotStart }] : []),
+        ...(slotNextGeo ? [{ from: p.geo!, to: slotNextGeo, departMinutes: slotStart + p.visitDuration }] : []),
+      ])
+    if (slotPrevGeo && slotNextGeo) requests.push({ from: slotPrevGeo, to: slotNextGeo, departMinutes: slotStart })
+    let live = true
+    fetchRoadLegs(date, requests).then((outcome) => {
+      if (live && outcome === 'ok') setLegsVersion((v) => v + 1)
+    })
+    return () => {
+      live = false
+    }
+    // Re-run only when a different slot opens; the geos and patients come along with it.
+  }, [cancelSlotKey, date]) // oxlint-disable-line react-hooks/exhaustive-deps
+
+  // A fresh lookup once real times for this slot arrive (or the route is rebuilt).
+  const slotLegs = useMemo(() => roadLegLookup(date), [date, legsVersion, plan.result]) // oxlint-disable-line react-hooks/exhaustive-deps
+
   const makeupCandidates =
     cancelTargetPatient && cancelTargetStop
       ? findMakeupCandidates({
@@ -188,9 +237,10 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
           slotEnd: cancelTargetStop.depart,
           allPatients: patients,
           scheduledPatientIdsToday: plan.patientIds.filter((id) => !plan.cancelledPatientIds.includes(id) && id !== cancelTargetPatient.id),
-          prevStopGeo: stops[stops.indexOf(cancelTargetStop) - 1]?.geo ?? null,
-          nextStopGeo: stops[stops.indexOf(cancelTargetStop) + 1]?.geo ?? null,
+          prevStopGeo: slotPrevGeo,
+          nextStopGeo: slotNextGeo,
           avgSpeedMph: settings.avgSpeedMph,
+          roadLeg: slotLegs,
         })
       : []
 
@@ -230,6 +280,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
             onUpdatePlan={updatePlan}
             onTogglePatient={togglePatientInDay}
             onBuild={handleBuild}
+            building={building}
           />
         ) : (
           <div className="px-4 space-y-4">
@@ -262,8 +313,8 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
             )}
 
             <div className="flex gap-2">
-              <Button variant="danger" size="lg" fullWidth onClick={handleRebuild}>
-                REBUILD ROUTE
+              <Button variant="danger" size="lg" fullWidth onClick={handleRebuild} disabled={building}>
+                {building ? 'REBUILDING…' : 'REBUILD ROUTE'}
               </Button>
             </div>
             <button onClick={() => setShowSetup(true)} className="w-full text-center text-[13.5px] font-semibold text-accent -mt-2">
@@ -271,6 +322,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
             </button>
 
             <StatsBar result={plan.result} />
+            <DriveTimeNotice result={plan.result} />
 
             {routeLinks.length > 1 && (
               <p className="text-[13px] text-muted -mb-2">

@@ -1,6 +1,7 @@
-import type { BuiltRoute, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, Weekday, WeatherImpact } from '../types'
+import type { BuiltRoute, DriveSource, GeoPoint, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, Weekday, WeatherImpact } from '../types'
 import { WEEKDAYS } from '../types'
 import { estimateLeg } from './distance'
+import type { RoadLeg } from './driveTimes'
 import { fromMinutes, toMinutes, weekdayOf } from './time'
 import { speedMultiplierFor, weatherAdvisory } from './weather'
 
@@ -29,7 +30,38 @@ export interface RoutingInput {
    * instead of the plan pretending everything is still on time.
    */
   resumeAtMinutes?: number
+  /**
+   * Real road drive time for a leg leaving at `departMinutes`, or null when there isn't one
+   * (offline, service down, never fetched). Null legs fall back to the straight-line estimate
+   * and are flagged as estimated on the route. Leave unset to estimate everything.
+   */
+  roadLeg?: (from: GeoPoint, to: GeoPoint, departMinutes: number) => RoadLeg | null
 }
+
+export interface DrivenLeg {
+  minutes: number
+  miles: number
+  source: DriveSource
+}
+
+/** One leg lookup for the whole build: real road time when we have it, the estimate when we don't. */
+export type LegFn = (from: GeoPoint, to: GeoPoint, departMinutes: number) => DrivenLeg
+
+export function legFunction(
+  avgSpeedMph: number,
+  speedMultiplier: number,
+  roadLeg?: RoutingInput['roadLeg'],
+): LegFn {
+  const estimateSpeed = avgSpeedMph * speedMultiplier
+  return (from, to, departMinutes) => {
+    const road = roadLeg?.(from, to, departMinutes)
+    // Google's traffic prediction doesn't know about snow, so a bad-weather day slows real legs the same way it slows estimates.
+    if (road) return { minutes: road.minutes / speedMultiplier, miles: road.miles, source: 'road' }
+    return { ...estimateLeg(from, to, estimateSpeed), source: 'estimate' }
+  }
+}
+
+const NO_DRIVE: DrivenLeg = { minutes: 0, miles: 0, source: 'road' }
 
 const OPEN_BLOCK_THRESHOLD_MINUTES = 15
 
@@ -115,6 +147,7 @@ interface ScheduledVisit {
   depart: number
   driveMinutes: number
   driveMiles: number
+  driveSource: DriveSource
 }
 
 /** Visits from index `afterCount` on can't leave for their drive before `atMinutes`. */
@@ -128,7 +161,7 @@ function simulateOrder(
   order: Patient[],
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
-  avgSpeedMph: number,
+  leg: LegFn,
   weekday: Weekday,
   resume?: Resume,
 ): { visits: ScheduledVisit[]; feasible: boolean; totalDriveMinutes: number; finishMinutes: number } {
@@ -147,20 +180,16 @@ function simulateOrder(
 
   order.forEach((patient, idx) => {
     if (resume && idx === resume.afterCount) applyResume()
-    let driveMinutes = 0
-    let driveMiles = 0
-    if (currentGeo && patient.geo) {
-      const leg = estimateLeg(currentGeo, patient.geo, avgSpeedMph)
-      driveMinutes = leg.minutes
-      driveMiles = leg.miles
-    }
+    const drive = currentGeo && patient.geo ? leg(currentGeo, patient.geo, currentTime) : NO_DRIVE
+    const driveMinutes = drive.minutes
+    const driveMiles = drive.miles
     const arrive = currentTime + driveMinutes
     const slot = findVisitSlot(patient, weekday, arrive)
     const actualStart = slot ?? arrive
     const depart = actualStart + patient.visitDuration
     if (slot === null) feasible = false
 
-    visits.push({ patient, arrive: actualStart, depart, driveMinutes, driveMiles })
+    visits.push({ patient, arrive: actualStart, depart, driveMinutes, driveMiles, driveSource: drive.source })
     totalDriveMinutes += driveMinutes
     currentTime = depart
     currentGeo = patient.geo ?? currentGeo
@@ -175,7 +204,7 @@ function greedyConstruct(
   candidates: Patient[],
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
-  avgSpeedMph: number,
+  leg: LegFn,
   weekday: Weekday,
 ): { order: Patient[]; unscheduled: Patient[] } {
   const remaining = [...candidates]
@@ -188,8 +217,8 @@ function greedyConstruct(
     let bestScore = Infinity
 
     remaining.forEach((patient, idx) => {
-      const leg = currentGeo && patient.geo ? estimateLeg(currentGeo, patient.geo, avgSpeedMph) : { minutes: 0, miles: 0 }
-      const arrive = currentTime + leg.minutes
+      const drive = currentGeo && patient.geo ? leg(currentGeo, patient.geo, currentTime) : NO_DRIVE
+      const arrive = currentTime + drive.minutes
       const actualStart = findVisitSlot(patient, weekday, arrive)
       if (actualStart === null) return
 
@@ -197,7 +226,7 @@ function greedyConstruct(
       const waitMinutes = actualStart - arrive
       const slackMinutes = windowEnd - actualStart
       // Prefer nearby + low-wait candidates, with a mild tie-break toward tighter deadlines.
-      const score = leg.minutes + waitMinutes * 0.75 + slackMinutes * 0.05
+      const score = drive.minutes + waitMinutes * 0.75 + slackMinutes * 0.05
       if (score < bestScore) {
         bestScore = score
         bestIdx = idx
@@ -207,8 +236,8 @@ function greedyConstruct(
     if (bestIdx === -1) break // nothing left is feasible from here; stop and report conflicts
 
     const [chosen] = remaining.splice(bestIdx, 1)
-    const leg = currentGeo && chosen.geo ? estimateLeg(currentGeo, chosen.geo, avgSpeedMph) : { minutes: 0, miles: 0 }
-    const arrive = currentTime + leg.minutes
+    const drive = currentGeo && chosen.geo ? leg(currentGeo, chosen.geo, currentTime) : NO_DRIVE
+    const arrive = currentTime + drive.minutes
     const actualStart = findVisitSlot(chosen, weekday, arrive) ?? arrive
     currentTime = actualStart + chosen.visitDuration
     currentGeo = chosen.geo ?? currentGeo
@@ -253,13 +282,13 @@ function improveOrder(
   order: Patient[],
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
-  avgSpeedMph: number,
+  leg: LegFn,
   weekday: Weekday,
   fixedCount = 0,
   resume?: Resume,
 ): Patient[] {
   let best = order
-  let bestResult = simulateOrder(best, start, dayStartMinutes, avgSpeedMph, weekday, resume)
+  let bestResult = simulateOrder(best, start, dayStartMinutes, leg, weekday, resume)
   if (!bestResult.feasible) return best
 
   let evaluations = 0
@@ -270,7 +299,7 @@ function improveOrder(
     improved = false
     for (const candidate of neighborhood(best, fixedCount)) {
       if (++evaluations > MAX_EVALUATIONS) break
-      const result = simulateOrder(candidate, start, dayStartMinutes, avgSpeedMph, weekday, resume)
+      const result = simulateOrder(candidate, start, dayStartMinutes, leg, weekday, resume)
       if (result.feasible && scheduleScore(result) < scheduleScore(bestResult) - 0.01) {
         best = candidate
         bestResult = result
@@ -301,7 +330,7 @@ function findLunchPlacement(
   lunch: LunchPreference,
   start: { geo: NamedLocation['geo'] },
   dayStartMinutes: number,
-  avgSpeedMph: number,
+  leg: LegFn,
   weekday: Weekday,
   resume?: Resume,
 ): LunchPlacement | null {
@@ -343,7 +372,7 @@ function findLunchPlacement(
       visits.slice(idx).map((v) => v.patient),
       { geo: fromGeo },
       lunchEnd,
-      avgSpeedMph,
+      leg,
       weekday,
     )
     if (!rest.feasible) continue
@@ -364,7 +393,7 @@ function buildStopId(prefix: string, key: string): string {
 
 export function buildRoute(input: RoutingInput): BuiltRoute {
   const { date, dayStartTime, startLocation, endLocation, patients, lunch, weatherImpact = 0, weatherLabel, makeupPatientIds } = input
-  const avgSpeedMph = input.avgSpeedMph * speedMultiplierFor(weatherImpact)
+  const leg = legFunction(input.avgSpeedMph, speedMultiplierFor(weatherImpact), input.roadLeg)
   const weekday = weekdayOf(date)
   const dayStartMinutes = toMinutes(dayStartTime)
   const conflicts: RouteConflict[] = []
@@ -395,14 +424,14 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
   const lockedIds = new Set(locked.map((p) => p.id))
   const resume: Resume | undefined =
     input.resumeAtMinutes !== undefined ? { afterCount: locked.length, atMinutes: input.resumeAtMinutes } : undefined
-  const lockedRun = simulateOrder(locked, startLocation, dayStartMinutes, avgSpeedMph, weekday, resume)
+  const lockedRun = simulateOrder(locked, startLocation, dayStartMinutes, leg, weekday, resume)
   const resumeGeo = locked.length > 0 ? (locked[locked.length - 1].geo ?? startLocation.geo) : startLocation.geo
 
   const { order: constructedRest, unscheduled } = greedyConstruct(
     eligible.filter((p) => !lockedIds.has(p.id)),
     { geo: resumeGeo },
     lockedRun.finishMinutes,
-    avgSpeedMph,
+    leg,
     weekday,
   )
   const constructed = [...locked, ...constructedRest]
@@ -416,10 +445,10 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     })
   }
 
-  const optimizedOrder = improveOrder(constructed, startLocation, dayStartMinutes, avgSpeedMph, weekday, locked.length, resume)
-  const simulated = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, avgSpeedMph, weekday, resume).visits
+  const optimizedOrder = improveOrder(constructed, startLocation, dayStartMinutes, leg, weekday, locked.length, resume)
+  const simulated = simulateOrder(optimizedOrder, startLocation, dayStartMinutes, leg, weekday, resume).visits
 
-  const lunchPlacement = findLunchPlacement(simulated, lunch, startLocation, dayStartMinutes, avgSpeedMph, weekday, resume)
+  const lunchPlacement = findLunchPlacement(simulated, lunch, startLocation, dayStartMinutes, leg, weekday, resume)
   const visits = lunchPlacement?.visits ?? simulated
   if (lunch.enabled && !lunchPlacement) {
     conflicts.push({ message: `Couldn't fit a ${lunch.duration}-min lunch between ${lunch.earliest}–${lunch.latest} without breaking a patient window. Add it manually or widen the lunch window.` })
@@ -487,6 +516,7 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
       depart: fromMinutes(visit.depart),
       driveMinutesFromPrev: Math.round(visit.driveMinutes),
       driveMilesFromPrev: Math.round(visit.driveMiles * 10) / 10,
+      driveSource: visit.driveSource,
       geo: visit.patient.geo,
     })
     cursorTime = visit.depart
@@ -509,13 +539,9 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
   }
 
   // Final leg home/end
-  let endDriveMinutes = 0
-  let endDriveMiles = 0
-  if (cursorGeo && endLocation.geo) {
-    const leg = estimateLeg(cursorGeo, endLocation.geo, avgSpeedMph)
-    endDriveMinutes = leg.minutes
-    endDriveMiles = leg.miles
-  }
+  const endDrive = cursorGeo && endLocation.geo ? leg(cursorGeo, endLocation.geo, cursorTime) : NO_DRIVE
+  const endDriveMinutes = endDrive.minutes
+  const endDriveMiles = endDrive.miles
   const endArrive = cursorTime + endDriveMinutes
   stops.push({
     id: buildStopId('end', date),
@@ -526,6 +552,7 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     depart: fromMinutes(endArrive),
     driveMinutesFromPrev: Math.round(endDriveMinutes),
     driveMilesFromPrev: Math.round(endDriveMiles * 10) / 10,
+    driveSource: endDrive.source,
     geo: endLocation.geo,
   })
 
@@ -533,6 +560,9 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
   const totalDriveMinutes = stops.reduce((sum, s) => sum + s.driveMinutesFromPrev, 0)
   const totalMiles = Math.round(stops.reduce((sum, s) => sum + s.driveMilesFromPrev, 0) * 10) / 10
   const openMinutes = stops.filter((s) => s.kind === 'open').reduce((sum, s) => sum + (toMinutes(s.depart) - toMinutes(s.arrive)), 0)
+  // Only legs that actually go somewhere count: a visit at the same address as the last one has no drive to estimate.
+  const drivenStops = stops.filter((s, i) => i > 0 && s.driveSource && s.driveMilesFromPrev + s.driveMinutesFromPrev > 0)
+  const estimatedLegCount = drivenStops.filter((s) => s.driveSource === 'estimate').length
   const totalSpan = endArrive - dayStartMinutes
   const efficiency = totalSpan > 0 ? Math.max(0, Math.min(100, Math.round(((totalTherapyMinutes + totalDriveMinutes) / totalSpan) * 100))) : 0
 
@@ -548,5 +578,24 @@ export function buildRoute(input: RoutingInput): BuiltRoute {
     efficiency,
     conflicts,
     weatherNote,
+    estimatedLegCount,
+    legCount: drivenStops.length,
   }
+}
+
+/**
+ * The legs a built route actually drives, with the time each one leaves -- so real
+ * traffic can be fetched for the hour that matters. Open/admin blocks don't move you.
+ */
+export function drivenLegs(route: BuiltRoute): Array<{ from: GeoPoint; to: GeoPoint; departMinutes: number }> {
+  const legs: Array<{ from: GeoPoint; to: GeoPoint; departMinutes: number }> = []
+  let prev: Stop | null = null
+  for (const stop of route.stops) {
+    if (stop.kind === 'open') continue
+    if (prev?.geo && stop.geo && (stop.kind === 'visit' || stop.kind === 'end')) {
+      legs.push({ from: prev.geo, to: stop.geo, departMinutes: toMinutes(prev.depart) })
+    }
+    if (stop.geo) prev = stop
+  }
+  return legs
 }

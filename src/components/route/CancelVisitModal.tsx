@@ -49,7 +49,7 @@ export function CancelVisitModal({ patient, stop, candidates, onAddCandidate, on
                 <p className="text-[14px] text-muted bg-app rounded-2xl px-4 py-4">No make-up visits are currently available.</p>
               ) : (
                 <div className="space-y-2">
-                  {candidates.map(({ patient: c, extraDriveMinutes }) => (
+                  {candidates.map(({ patient: c, extraDriveMinutes, driveEstimated }) => (
                     <div key={c.id} className="bg-app rounded-2xl border border-line-soft px-4 py-3.5 flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -58,7 +58,7 @@ export function CancelVisitModal({ patient, stop, candidates, onAddCandidate, on
                         </div>
                         <div className="text-[12.5px] text-muted truncate">
                           {c.visitDuration} min · window {formatTime(c.windowStart)}–{formatTime(c.windowEnd)}
-                          {extraDriveMinutes !== null ? ` · ~${Math.round(extraDriveMinutes)} min added drive` : ''}
+                          {extraDriveMinutes !== null ? ` · ${driveEstimated ? 'about ' : ''}${Math.round(extraDriveMinutes)} min added drive${driveEstimated ? ' (est.)' : ''}` : ''}
                         </div>
                       </div>
                       <Button size="md" onClick={() => onAddCandidate(c.id)} className="shrink-0">
