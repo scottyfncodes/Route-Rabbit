@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PatientCard } from '../components/patients/PatientCard'
 import { PatientForm, type PatientFormValues } from '../components/patients/PatientForm'
 import type { usePatients } from '../hooks/usePatients'
+import { useBackHandler } from '../hooks/useBackHandler'
 import type { GeoPoint, Patient } from '../types'
 
 interface Props {
@@ -16,6 +17,7 @@ export function PatientsPage({ patientsApi, homeGeo }: Props) {
   const { patients, addPatient, updatePatient, removePatient, setStatus } = patientsApi
   const [editing, setEditing] = useState<Patient | 'new' | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  useBackHandler(editing !== null, () => setEditing(null))
 
   const active = patients.filter((p) => p.status === 'active').sort(byInitials)
   const archived = patients.filter((p) => p.status === 'inactive').sort(byInitials)

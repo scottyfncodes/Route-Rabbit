@@ -10,6 +10,7 @@ import { usePatients } from './hooks/usePatients'
 import { useSettings } from './hooks/useSettings'
 import { useTheme } from './hooks/useTheme'
 import { useOnline } from './hooks/useOnline'
+import { useBackHandler } from './hooks/useBackHandler'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('today')
@@ -19,6 +20,9 @@ export default function App() {
   const { settings, updateSettings } = useSettings()
   useTheme(settings.themeMode)
   const online = useOnline()
+  // Phone back: a day's overview closes first, then any tab goes back to Home.
+  useBackHandler(tab !== 'today', () => setTab('today'))
+  useBackHandler(dayView !== null, () => setDayView(null))
 
   const handleTabChange = (t: Tab) => {
     setDayView(null)
@@ -30,7 +34,7 @@ export default function App() {
       {!settings.onboardingSeen && <PrivacyOnboarding onDismiss={() => updateSettings({ onboardingSeen: true })} />}
 
       {!online && (
-        <div role="status" className="bg-amber-50 border-b border-amber-100 px-4 py-2 text-[12.5px] text-warning leading-snug" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
+        <div role="status" className="bg-amber-50 border-b border-amber-100 px-4 py-2 text-[12.5px] text-warning leading-snug">
           No signal. Your routes and patients still work. Maps, weather, and new addresses load when you're back online.
         </div>
       )}
