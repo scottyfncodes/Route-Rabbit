@@ -1,5 +1,4 @@
-import { TWICE_A_MONTH, type Patient, type VisitOption, type Weekday } from '../types'
-import { selectWeeklyDays } from './routing'
+import { TWICE_A_MONTH, type Patient, type VisitOption } from '../types'
 import { startOfWeek } from './time'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -41,10 +40,4 @@ export function isVisitWeek(patient: Pick<Patient, 'createdAt'>, weekStart: stri
   const week = new Date(`${startOfWeek(weekStart)}T00:00:00`).getTime()
   const weeks = Math.round((week - anchor) / WEEK_MS)
   return Math.abs(weeks) % 2 === 0
-}
-
-/** Which weekdays this patient gets a visit in the given week, under the given option. */
-export function visitDaysForWeek(patient: Patient, option: VisitOption, weekStart: string): Weekday[] {
-  if (option.perWeek === TWICE_A_MONTH && !isVisitWeek(patient, weekStart)) return []
-  return selectWeeklyDays(withOption(patient, option))
 }

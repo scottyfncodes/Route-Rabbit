@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TWICE_A_MONTH, type Patient } from '../types'
-import { isVisitWeek, optionLabel, visitDaysForWeek, visitOptionsOf } from './visitOptions'
+import { isVisitWeek, optionLabel, visitOptionsOf } from './visitOptions'
 
 // 2025-01-06 is a Monday.
 const created = new Date('2025-01-08T10:00:00').getTime() // a Wednesday in that week
@@ -48,20 +48,7 @@ describe('twice a month', () => {
     expect(isVisitWeek(p, '2024-12-30')).toBe(false)
   })
 
-  it('gives one day in visit weeks and none in off weeks', () => {
-    const p = patient()
-    const option = { duration: 60, perWeek: TWICE_A_MONTH }
-    expect(visitDaysForWeek(p, option, '2025-01-06')).toEqual(['Wed'])
-    expect(visitDaysForWeek(p, option, '2025-01-13')).toEqual([])
-  })
-
   it('reads plainly', () => {
     expect(optionLabel({ duration: 30, perWeek: TWICE_A_MONTH })).toBe('30 min, 2× a month')
-  })
-})
-
-describe('weekly options', () => {
-  it('picks as many days as the option asks for', () => {
-    expect(visitDaysForWeek(patient(), { duration: 30, perWeek: 2 }, '2025-01-13')).toEqual(['Mon', 'Fri'])
   })
 })
