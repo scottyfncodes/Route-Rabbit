@@ -119,7 +119,8 @@ function findVisitSlot(patient: Patient, weekday: Weekday, arrival: number): num
  */
 export function selectWeeklyDays(patient: Patient): Weekday[] {
   const available = WEEKDAYS.filter((d) => patient.availableDays.includes(d))
-  const need = patient.visitsPerWeek
+  // Twice a month is one visit in the weeks it applies; which weeks is decided by the caller.
+  const need = patient.visitsPerWeek === null ? null : Math.ceil(patient.visitsPerWeek)
   if (!need || need >= available.length) return available
   if (need <= 0) return []
 

@@ -100,6 +100,12 @@ export function WeeklyPage({ onSelectDate, patientsApi, settings }: Props) {
               {summary.totalVisits} visit{summary.totalVisits === 1 ? '' : 's'} across {summary.daysBuilt} days
               {summary.daysWithConflicts > 0 ? ` · ${summary.daysWithConflicts} day${summary.daysWithConflicts === 1 ? '' : 's'} need attention` : ''}
             </div>
+            {summary.alternatesUsed > 0 && (
+              <p className="text-[13px] text-ink mt-1 leading-snug">
+                {summary.alternatesUsed} patient{summary.alternatesUsed === 1 ? '' : 's'} didn't fit on their first choice, so{' '}
+                they're scheduled with another visit option.
+              </p>
+            )}
             {summary.estimatedLegs > 0 && (
               <p className="text-[13px] text-warning mt-1 leading-snug">
                 Real road times couldn't be loaded for {summary.estimatedLegs} drive{summary.estimatedLegs === 1 ? '' : 's'}, so those are

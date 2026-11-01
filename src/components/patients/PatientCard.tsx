@@ -1,3 +1,4 @@
+import { frequencyLabel, visitOptionsOf } from '../../lib/visitOptions'
 import type { Patient } from '../../types'
 import { PriorityDot } from '../ui/PriorityDot'
 import { formatDays, formatTime } from '../../lib/time'
@@ -26,8 +27,10 @@ export function PatientCard({ patient, onEdit, onToggleStatus }: Props) {
             <span className="font-semibold text-[16px] text-ink truncate">{patient.address}</span>
           </div>
           <div className="text-[13px] text-muted mt-0.5">
-            {patient.visitDuration} min · {formatDays(patient.availableDays)}
-            {patient.visitsPerWeek ? ` · ${patient.visitsPerWeek}×/week` : ''}
+            {visitOptionsOf(patient)
+              .map((o) => `${o.duration} min${o.perWeek === null ? '' : ` ${frequencyLabel(o.perWeek)}`}`)
+              .join(' or ')}{' '}
+            · {formatDays(patient.availableDays)}
           </div>
           <div className="text-[13px] text-muted">
             {formatTime(patient.windowStart)}–{formatTime(patient.windowEnd)}

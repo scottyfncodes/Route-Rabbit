@@ -20,6 +20,16 @@ export interface PatientConflict {
   endTime: string // "HH:MM" 24h
 }
 
+/** Stored as half a visit per week: one visit every other week. */
+export const TWICE_A_MONTH = 0.5
+
+/** One acceptable way to see a patient, e.g. 60 min once a week, or 30 min twice a week. */
+export interface VisitOption {
+  duration: number // minutes
+  /** Visits per week. null = every available day. TWICE_A_MONTH (0.5) = every other week. */
+  perWeek: number | null
+}
+
 export interface Patient {
   id: string
   initials: string
@@ -37,6 +47,11 @@ export interface Patient {
   windowEnd: string // "HH:MM" 24h
   /** How many of their available days actually need a visit each week. null = every available day. */
   visitsPerWeek: number | null
+  /**
+   * Every acceptable visit plan, first choice first. visitDuration/visitsPerWeek always mirror
+   * the first one. Missing on patients saved before this existed (they have just the one).
+   */
+  visitOptions?: VisitOption[]
   conflicts: PatientConflict[]
   notes?: string
   status: PatientStatus
@@ -72,6 +87,8 @@ export interface DayPlan {
   lunch: LunchPreference
   currentLocationOverride: NamedLocation | null
   activeStopId: string | null
+  /** Visit length per patient for this day, when Build My Week picked one of their other visit options. */
+  visitDurations?: Record<string, number>
   result: BuiltRoute | null
 }
 

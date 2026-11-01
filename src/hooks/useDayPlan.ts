@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
-import { selectWeeklyDays } from '../lib/routing'
+import { visitDaysForWeek, visitOptionsOf, withOption } from '../lib/visitOptions'
 import { planRoute } from '../lib/planRoute'
 import { addDays, weekdayOf } from '../lib/time'
-import type { AppSettings, DayPlan, DayWeather, Patient } from '../types'
+import type { AppSettings, BuiltRoute, DayPlan, DayWeather, Patient } from '../types'
 
 const KEY = 'dayPlans'
 type DayPlanMap = Record<string, DayPlan>
@@ -31,6 +31,12 @@ function defaultPlan(date: string, settings: AppSettings): DayPlan {
 /** Fills in fields added after a plan may have already been saved to storage (e.g. an older day plan with no makeupPatientIds yet). */
 function withPlanDefaults(date: string, settings: AppSettings, stored?: Partial<DayPlan>): DayPlan {
   return { ...defaultPlan(date, settings), ...stored }
+}
+
+function withoutKey(record: Record<string, number> | undefined, key: string): Record<string, number> | undefined {
+  if (!record || !(key in record)) return record
+  const { [key]: _removed, ...rest } = record
+  return rest
 }
 
 export function useDayPlan(date: string, settings: AppSettings) {
@@ -61,6 +67,7 @@ export function useDayPlan(date: string, settings: AppSettings) {
           patientIds: has ? prev.patientIds.filter((id) => id !== patientId) : [...prev.patientIds, patientId],
           cancelledPatientIds: prev.cancelledPatientIds.filter((id) => id !== patientId),
           makeupPatientIds: prev.makeupPatientIds.filter((id) => id !== patientId),
+          visitDurations: withoutKey(prev.visitDurations, patientId),
         }
       })
     },
@@ -101,7 +108,12 @@ export interface WeekBuildSummary {
   daysWithConflicts: number
   /** Driving legs across the week that fell back to the estimate. */
   estimatedLegs: number
+  /** Patients scheduled with one of their other visit options because their first choice didn't fit. */
+  alternatesUsed: number
 }
+
+/** How many times Build My Week re-plans to try patients' other visit options. */
+const MAX_OPTION_PASSES = 3
 
 /**
  * Builds an optimized route for every day of the given week in one pass, using
@@ -109,6 +121,10 @@ export interface WeekBuildSummary {
  * Keeps each day's existing start/end location, day-start time, and lunch
  * preferences (falling back to defaults for days with no saved plan yet), but
  * replaces that day's patient selection and result outright.
+ *
+ * Patients with more than one visit option (e.g. 60 min once a week, or 30 min
+ * twice a week) start on their first choice. Anyone the router couldn't fit on
+ * one of their days moves to their next option and the week is re-planned.
  */
 export async function buildWeekRoutes(
   weekStart: string,
@@ -117,52 +133,84 @@ export async function buildWeekRoutes(
   dailyWeather?: Record<string, DayWeather>,
 ): Promise<WeekBuildSummary> {
   const map = readStorage<DayPlanMap>(KEY, {})
-  let totalVisits = 0
-  let daysWithConflicts = 0
-  let daysBuilt = 0
-  let estimatedLegs = 0
+  const active = patients.filter((p) => p.status === 'active')
+  const optionIndex = new Map(active.map((p) => [p.id, 0]))
+  const dates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const results = new Map<string, { key: string; patients: Patient[]; result: BuiltRoute }>()
 
-  // Pin each patient's actual visit days for the whole week up front, so a
-  // visitsPerWeek cap picks the same specific weekdays across every day's
-  // build rather than being re-decided (and potentially drifting) per day.
-  const weeklyDaysByPatient = new Map(patients.map((p) => [p.id, selectWeeklyDays(p)]))
-
-  for (let i = 0; i < 7; i++) {
-    const date = addDays(weekStart, i)
-    const weekday = weekdayOf(date)
-    const existing = map[date] ?? defaultPlan(date, settings)
-    const dayPatients = patients.filter((p) => p.status === 'active' && (weeklyDaysByPatient.get(p.id) ?? []).includes(weekday))
-    const weather = dailyWeather?.[date]
-
-    // One day at a time: each day's drive times come from its own date, and most legs repeat (and hit the cache) day to day.
-    const result = await planRoute({
-      date,
-      dayStartTime: existing.dayStartTime,
-      startLocation: existing.startLocation,
-      endLocation: existing.endLocation,
-      patients: dayPatients,
-      lunch: existing.lunch,
-      avgSpeedMph: settings.avgSpeedMph,
-      weatherImpact: weather?.impact,
-      weatherLabel: weather?.label,
+  for (let pass = 0; pass <= MAX_OPTION_PASSES; pass++) {
+    // Pin each patient's actual visit days for the whole week up front, so a
+    // visitsPerWeek cap picks the same specific weekdays across every day's
+    // build rather than being re-decided (and potentially drifting) per day.
+    const scheduled = active.map((p) => {
+      const option = visitOptionsOf(p)[optionIndex.get(p.id) ?? 0]
+      return { patient: withOption(p, option), days: visitDaysForWeek(p, option, weekStart) }
     })
 
+    for (const date of dates) {
+      const weekday = weekdayOf(date)
+      const existing = map[date] ?? defaultPlan(date, settings)
+      const dayPatients = scheduled.filter((s) => s.days.includes(weekday)).map((s) => s.patient)
+      const key = dayPatients.map((p) => `${p.id}:${p.visitDuration}`).join('|')
+      // Nothing changed for this day since the last pass, so its route would come out the same.
+      if (results.get(date)?.key === key) continue
+      const weather = dailyWeather?.[date]
+
+      // One day at a time: each day's drive times come from its own date, and most legs repeat (and hit the cache) day to day.
+      const result = await planRoute({
+        date,
+        dayStartTime: existing.dayStartTime,
+        startLocation: existing.startLocation,
+        endLocation: existing.endLocation,
+        patients: dayPatients,
+        lunch: existing.lunch,
+        avgSpeedMph: settings.avgSpeedMph,
+        weatherImpact: weather?.impact,
+        weatherLabel: weather?.label,
+      })
+      results.set(date, { key, patients: dayPatients, result })
+    }
+
+    // Who didn't make it onto a day they were planned for, and has another option to try?
+    let advanced = false
+    for (const { patients: dayPatients, result } of results.values()) {
+      const visited = new Set(result.stops.filter((s) => s.kind === 'visit').map((s) => s.patientId))
+      for (const p of dayPatients) {
+        if (visited.has(p.id) || !p.geo) continue
+        const original = active.find((a) => a.id === p.id)
+        const idx = optionIndex.get(p.id) ?? 0
+        if (original && idx + 1 < visitOptionsOf(original).length) {
+          optionIndex.set(p.id, idx + 1)
+          advanced = true
+        }
+      }
+    }
+    if (!advanced) break
+  }
+
+  let totalVisits = 0
+  let daysWithConflicts = 0
+  let estimatedLegs = 0
+  for (const date of dates) {
+    const built = results.get(date)
+    if (!built) continue
+    const existing = map[date] ?? defaultPlan(date, settings)
     map[date] = {
       ...existing,
-      patientIds: dayPatients.map((p) => p.id),
+      patientIds: built.patients.map((p) => p.id),
       cancelledPatientIds: [],
       makeupPatientIds: [],
       activeStopId: null,
       currentLocationOverride: null,
-      result,
+      visitDurations: Object.fromEntries(built.patients.map((p) => [p.id, p.visitDuration])),
+      result: built.result,
     }
-
-    daysBuilt += 1
-    totalVisits += result.visitCount
-    if (result.conflicts.length > 0) daysWithConflicts += 1
-    estimatedLegs += result.estimatedLegCount ?? 0
+    totalVisits += built.result.visitCount
+    if (built.result.conflicts.length > 0) daysWithConflicts += 1
+    estimatedLegs += built.result.estimatedLegCount ?? 0
   }
 
   writeStorage(KEY, map)
-  return { daysBuilt, totalVisits, daysWithConflicts, estimatedLegs }
+  const alternatesUsed = [...optionIndex.values()].filter((i) => i > 0).length
+  return { daysBuilt: dates.length, totalVisits, daysWithConflicts, estimatedLegs, alternatesUsed }
 }
