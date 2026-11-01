@@ -263,3 +263,46 @@ describe('buildRouteLinks', () => {
     ])
   })
 })
+
+describe('buildRoute scheduling rules', () => {
+  /** A point `east` miles east and `north` miles north of home. */
+  const at = (eastMi: number, northMi: number): GeoPoint => ({ lat: HOME.lat + northMi / 69, lng: HOME.lng + eastMi / 53 })
+
+  it('fits a farther patient with an early cutoff instead of dropping them for closer ones', () => {
+    const early = patient({ geo: at(8, 0), windowStart: '08:00', windowEnd: '11:00' })
+    const close = [1, 2, 3, 4].map((i) => patient({ geo: at(-1, i * 0.3) }))
+    const route = buildRoute(input([early, ...close]))
+    expect(route.visitCount).toBe(5)
+    expect(route.conflicts).toEqual([])
+    expectConsistentTimeline(route.stops)
+  })
+
+  it('keeps high priority visits and leaves off lower priority ones when the day is too full', () => {
+    // Six 2-hour visits on the same block in an 8:00-17:00 day: only four fit.
+    const two = (priority: Patient['priority']) => [0, 1].map(() => patient({ priority, visitDuration: 120, geo: east(1) }))
+    const low = two('low')
+    const medium = two('medium')
+    const high = two('high')
+    const route = buildRoute(input([...low, ...medium, ...high]))
+    const seen = new Set(visitOrder(route.stops))
+    for (const p of [...high, ...medium]) expect(seen.has(p.id)).toBe(true)
+    for (const p of low) expect(seen.has(p.id)).toBe(false)
+  })
+
+  it('never bumps a high priority patient for a lower priority one, even one who is closer', () => {
+    const high = patient({ priority: 'high', geo: at(10, 0), windowStart: '09:00', windowEnd: '10:00', visitDuration: 60 })
+    const low = patient({ priority: 'low', geo: at(0.5, 0), windowStart: '09:00', windowEnd: '10:00', visitDuration: 60 })
+    const seen = visitOrder(buildRoute(input([low, high])).stops)
+    expect(seen).toEqual([high.id])
+  })
+
+  it('counts the drive home, ending the day near home when that gets you back sooner', () => {
+    // Out and back along a line: visiting the far patient last would leave a long drive home.
+    const near = patient({ geo: at(0, 2) })
+    const far = patient({ geo: at(0, 12) })
+    const side = patient({ geo: at(6, 6) })
+    const route = buildRoute(input([near, far, side]))
+    const order = visitOrder(route.stops)
+    expect(order[order.length - 1]).not.toBe(far.id)
+  })
+})

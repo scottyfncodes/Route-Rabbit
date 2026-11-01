@@ -20,14 +20,17 @@ change mid-day.
   just initials, address, one or more visit options (length and how often, e.g.
   "60 min 1x a week, or 30 min 2x a week", including twice a month), available
   days, a time window, recurring blocked-time conflicts, a scheduling
-  priority (High/Medium/Low, shown as a small colored dot), and whether they're
+  priority (High/Medium/Low, shown as a small colored dot: whose schedule is set
+  first, and who is never bumped for a lower-priority visit), and whether they're
   available to fill make-up slots.
 - **Build My Week.** One tap builds an optimized route for every day of the
   week from each active patient's own available days -- or build/rebuild a
   single day from its overview screen. A patient seen fewer times than
   they're available (e.g. available Mon/Wed/Fri but only needs 2x/week) gets
-  the same specific days picked every week, spread so no day is packed while
-  another sits nearly empty; twice-a-month patients are seen
+  the same specific days picked every week. Days are chosen across the whole
+  caseload: evenly loaded, each kept to one part of town where it can be, not
+  overbooked in the same hours (after-school windows, blocked times), and
+  higher-priority patients pick first; twice-a-month patients are seen
   every other week; a patient whose first-choice visit option won't fit that
   week is scheduled with their next option; conflicts (e.g. "Tue 12-1,
   recurring pickup") are treated as hard blocks the router schedules around.
@@ -40,8 +43,7 @@ change mid-day.
   the stop you've marked "I'm Here" stay put; only the rest of the day is re-planned,
   starting from the current time, so a visit that ran long pushes the rest of the day back.
 - **Cancellation + make-up visits.** Cancelling a visit walks you through finding a
-  replacement: ranked make-up candidates (High/Medium/Low scheduling priority first,
-  then least added drive time) who are marked available for make-up visits, fit the
+  replacement: make-up candidates ranked by least added drive time, who are marked available for make-up visits, fit the
   vacated window, and aren't already on the day's route -- or just leave the slot
   open. Cancelling never deletes the patient or changes their active/discharged
   status; a chosen replacement becomes a real, persisted stop on the route (labeled

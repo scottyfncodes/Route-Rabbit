@@ -140,10 +140,10 @@ export async function buildWeekRoutes(
   const results = new Map<string, { key: string; patients: Patient[]; result: BuiltRoute }>()
 
   for (let pass = 0; pass <= MAX_OPTION_PASSES; pass++) {
-    // Pin everyone's visit days for the whole week up front, balanced across the
-    // caseload so no day ends up packed while another sits nearly empty.
+    // Pin everyone's visit days for the whole week up front: days evenly loaded, each
+    // kept to one area, not overbooked in the same hours, priority patients first.
     const withOptions = active.map((p) => withOption(p, visitOptionsOf(p)[optionIndex.get(p.id) ?? 0]))
-    const weekDays = assignWeekDays(withOptions)
+    const weekDays = assignWeekDays(withOptions, { home: settings.homeGeo, avgSpeedMph: settings.avgSpeedMph })
     const scheduled = withOptions.map((patient) => {
       const offWeek = patient.visitsPerWeek === TWICE_A_MONTH && !isVisitWeek(patient, weekStart)
       return { patient, days: offWeek ? [] : (weekDays.get(patient.id) ?? []) }
