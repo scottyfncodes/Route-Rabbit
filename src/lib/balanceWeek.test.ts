@@ -79,3 +79,47 @@ describe('assignWeekDays', () => {
     expect(assignWeekDays(patients)).toEqual(assignWeekDays([...patients].reverse()))
   })
 })
+
+describe('assignWeekDays across the map and the clock', () => {
+  const HOME = { lat: 40, lng: -75 }
+  const at = (eastMi: number, northMi: number) => ({ lat: HOME.lat + northMi / 69, lng: HOME.lng + eastMi / 53 })
+
+  it('keeps each day to one part of town when the load is the same either way', () => {
+    const north = Array.from({ length: 5 }, (_, i) => patient({ geo: at(i * 0.5, 12) }))
+    const south = Array.from({ length: 5 }, (_, i) => patient({ geo: at(i * 0.5, -12) }))
+    const assigned = assignWeekDays([...north, ...south], { home: HOME })
+    const counts = perDay(assigned)
+    for (const d of WEEKDAYS_ONLY) expect(counts[d]).toBe(2)
+    const mixed = WEEKDAYS_ONLY.filter((d) => {
+      const on = (ps: Patient[]) => ps.some((p) => assigned.get(p.id)!.includes(d))
+      return on(north) && on(south)
+    })
+    expect(mixed.length).toBeLessThanOrEqual(1)
+  })
+
+  it('does not stack more after-school visits on one afternoon than fit', () => {
+    const afterSchool = Array.from({ length: 5 }, () => patient({ windowStart: '15:00', windowEnd: '17:00', visitDuration: 45 }))
+    const allDay = Array.from({ length: 10 }, () => patient({ visitDuration: 45 }))
+    const assigned = assignWeekDays([...allDay, ...afterSchool])
+    const perDayAfterSchool = WEEKDAYS_ONLY.map((d) => afterSchool.filter((p) => assigned.get(p.id)!.includes(d)).length)
+    expect(Math.max(...perDayAfterSchool)).toBe(1)
+  })
+
+  it('works around blocked times on specific weekdays', () => {
+    // Free 3-5 PM, but blocked Mon-Thu: Friday is the only day the visit can happen.
+    const blocked = (['Mon', 'Tue', 'Wed', 'Thu'] as Weekday[]).map((day, i) => ({ id: `c${i}`, day, startTime: '15:00', endTime: '17:00' }))
+    const p = patient({ windowStart: '15:00', windowEnd: '17:00', conflicts: blocked })
+    const others = Array.from({ length: 4 }, () => patient({ windowStart: '15:00', windowEnd: '17:00' }))
+    expect(assignWeekDays([...others, p]).get(p.id)).toEqual(['Fri'])
+  })
+
+  it('lets high priority patients pick first', () => {
+    // Everyone wants the same lone afternoon slot on their only free days; the high priority patient gets the open one.
+    const high = patient({ priority: 'high', availableDays: ['Mon', 'Tue'], windowStart: '15:00', windowEnd: '16:00', visitDuration: 60 })
+    const low = patient({ priority: 'low', id: 'a-first-by-id', availableDays: ['Mon', 'Tue'], windowStart: '15:00', windowEnd: '16:00', visitDuration: 60 })
+    const fixedMon = patient({ availableDays: ['Mon'], visitsPerWeek: 1, windowStart: '15:00', windowEnd: '16:00', visitDuration: 60 })
+    const assigned = assignWeekDays([low, fixedMon, high])
+    expect(assigned.get(high.id)).toEqual(['Tue'])
+    expect(assigned.get(low.id)).toEqual(['Mon'])
+  })
+})

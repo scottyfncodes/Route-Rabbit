@@ -499,7 +499,7 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
             ))}
           </div>
           <p className="text-[12px] text-subtle mt-1.5">
-            Who to call first when a make-up slot opens up. An administrative scheduling preference, not a clinical priority.
+            Whose schedule gets set first. High priority visits are planned before anyone else's and are never bumped for a lower priority patient. An administrative scheduling preference, not a clinical priority.
           </p>
         </div>
 

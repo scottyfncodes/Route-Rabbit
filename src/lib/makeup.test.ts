@@ -62,11 +62,10 @@ describe('findMakeupCandidates', () => {
     expect(find([blockedTuesday])).toEqual([blockedTuesday.id])
   })
 
-  it('ranks by priority first, then by added drive time', () => {
+  it('ranks by added drive time only, whatever the scheduling priority', () => {
     const lowNear = patient({ priority: 'low', geo: { lat: 40, lng: -74.95 } })
     const highFar = patient({ priority: 'high', geo: { lat: 40.3, lng: -75 } })
-    const medFar = patient({ priority: 'medium', geo: { lat: 40.3, lng: -75 } })
-    const medNear = patient({ priority: 'medium', geo: { lat: 40, lng: -74.95 } })
-    expect(find([lowNear, medFar, highFar, medNear])).toEqual([highFar.id, medNear.id, medFar.id, lowNear.id])
+    const medMid = patient({ priority: 'medium', geo: { lat: 40.1, lng: -75 } })
+    expect(find([highFar, medMid, lowNear])).toEqual([lowNear.id, medMid.id, highFar.id])
   })
 })

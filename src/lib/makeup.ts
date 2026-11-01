@@ -1,4 +1,4 @@
-import type { GeoPoint, Patient, PatientPriority, Weekday } from '../types'
+import type { GeoPoint, Patient, Weekday } from '../types'
 import type { RoadLeg } from './driveTimes'
 import { legFunction, type LegFn } from './routing'
 import { toMinutes } from './time'
@@ -28,8 +28,6 @@ export interface FindMakeupCandidatesInput {
   /** Real road legs where cached; anything missing falls back to the estimate. */
   roadLeg?: (from: GeoPoint, to: GeoPoint, departMinutes: number) => RoadLeg | null
 }
-
-const PRIORITY_RANK: Record<PatientPriority, number> = { high: 0, medium: 1, low: 2 }
 
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
   return aStart < bEnd && bStart < aEnd
@@ -77,8 +75,8 @@ function routeImpact(
  * Availability on the cancelled day's *regular* schedule is deliberately not required: a
  * make-up visit is, by definition, outside someone's normal routine.
  *
- * Ranking: scheduling priority (High before Medium before Low) first, then the least
- * added drive time within the same priority tier.
+ * Ranking: least added drive time first. Scheduling priority isn't used here; it decides
+ * whose regular visits get planned first, not who fills an opening.
  */
 export function findMakeupCandidates(input: FindMakeupCandidatesInput): MakeupCandidate[] {
   const { cancelledPatientId, weekday, slotStart, slotEnd, allPatients, scheduledPatientIdsToday, prevStopGeo, nextStopGeo, avgSpeedMph } = input
@@ -97,9 +95,7 @@ export function findMakeupCandidates(input: FindMakeupCandidatesInput): MakeupCa
     .map((patient) => ({ patient, ...routeImpact(patient, prevStopGeo, nextStopGeo, start, leg) }))
 
   candidates.sort((a, b) => {
-    const rankDiff = PRIORITY_RANK[a.patient.priority] - PRIORITY_RANK[b.patient.priority]
-    if (rankDiff !== 0) return rankDiff
-    // Unknown drive impact sorts last within its tier (and never yields NaN from Infinity - Infinity).
+    // Unknown drive impact sorts last (and never yields NaN from Infinity - Infinity).
     if (a.extraDriveMinutes === null || b.extraDriveMinutes === null) {
       return Number(a.extraDriveMinutes === null) - Number(b.extraDriveMinutes === null)
     }
