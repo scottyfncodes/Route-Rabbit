@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRoute, selectWeeklyDays, type RoutingInput } from './routing'
+import { buildRoute, type RoutingInput } from './routing'
 import { buildRouteLinks } from './googleMaps'
 import { toMinutes } from './time'
 import type { GeoPoint, Patient, Stop } from '../types'
@@ -261,26 +261,5 @@ describe('buildRouteLinks', () => {
       [1, 10, false],
       [11, 12, true],
     ])
-  })
-})
-
-describe('selectWeeklyDays', () => {
-  it('returns every available day when there is no weekly target', () => {
-    expect(selectWeeklyDays(patient({ availableDays: ['Fri', 'Mon'] }))).toEqual(['Mon', 'Fri'])
-  })
-
-  it('spreads a smaller weekly target evenly and deterministically', () => {
-    const p = patient({ availableDays: ['Mon', 'Wed', 'Fri'], visitsPerWeek: 2 })
-    expect(selectWeeklyDays(p)).toEqual(['Mon', 'Fri'])
-    expect(selectWeeklyDays(p)).toEqual(selectWeeklyDays(p))
-  })
-
-  it('picks the middle day for a once-a-week patient', () => {
-    expect(selectWeeklyDays(patient({ availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], visitsPerWeek: 1 }))).toEqual(['Wed'])
-  })
-
-  it('always returns exactly the requested number of days', () => {
-    const p = patient({ availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], visitsPerWeek: 4 })
-    expect(selectWeeklyDays(p)).toHaveLength(4)
   })
 })

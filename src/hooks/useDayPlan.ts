@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readStorage, writeStorage } from '../lib/storage'
-import { visitDaysForWeek, visitOptionsOf, withOption } from '../lib/visitOptions'
+import { assignWeekDays } from '../lib/balanceWeek'
+import { isVisitWeek, visitOptionsOf, withOption } from '../lib/visitOptions'
 import { planRoute } from '../lib/planRoute'
 import { addDays, weekdayOf } from '../lib/time'
-import type { AppSettings, BuiltRoute, DayPlan, DayWeather, Patient } from '../types'
+import { TWICE_A_MONTH, type AppSettings, type BuiltRoute, type DayPlan, type DayWeather, type Patient } from '../types'
 
 const KEY = 'dayPlans'
 type DayPlanMap = Record<string, DayPlan>
@@ -139,12 +140,13 @@ export async function buildWeekRoutes(
   const results = new Map<string, { key: string; patients: Patient[]; result: BuiltRoute }>()
 
   for (let pass = 0; pass <= MAX_OPTION_PASSES; pass++) {
-    // Pin each patient's actual visit days for the whole week up front, so a
-    // visitsPerWeek cap picks the same specific weekdays across every day's
-    // build rather than being re-decided (and potentially drifting) per day.
-    const scheduled = active.map((p) => {
-      const option = visitOptionsOf(p)[optionIndex.get(p.id) ?? 0]
-      return { patient: withOption(p, option), days: visitDaysForWeek(p, option, weekStart) }
+    // Pin everyone's visit days for the whole week up front, balanced across the
+    // caseload so no day ends up packed while another sits nearly empty.
+    const withOptions = active.map((p) => withOption(p, visitOptionsOf(p)[optionIndex.get(p.id) ?? 0]))
+    const weekDays = assignWeekDays(withOptions)
+    const scheduled = withOptions.map((patient) => {
+      const offWeek = patient.visitsPerWeek === TWICE_A_MONTH && !isVisitWeek(patient, weekStart)
+      return { patient, days: offWeek ? [] : (weekDays.get(patient.id) ?? []) }
     })
 
     for (const date of dates) {

@@ -1,5 +1,4 @@
 import type { BuiltRoute, DriveSource, GeoPoint, LunchPreference, NamedLocation, Patient, RouteConflict, Stop, Weekday, WeatherImpact } from '../types'
-import { WEEKDAYS } from '../types'
 import { estimateLeg } from './distance'
 import type { RoadLeg } from './driveTimes'
 import { fromMinutes, toMinutes, weekdayOf } from './time'
@@ -108,38 +107,6 @@ function findVisitSlot(patient: Patient, weekday: Weekday, arrival: number): num
   const windowEnd = toMinutes(patient.windowEnd)
   const free = freeIntervals(windowStart, windowEnd, conflictIntervalsFor(patient, weekday))
   return earliestSlot(free, arrival, patient.visitDuration)
-}
-
-/**
- * Picks which of a patient's available days actually get a visit each week, for
- * patients seen less often than they're available (e.g. available Mon/Wed/Fri but
- * only needs 2x/week). Spreads the chosen days evenly across their available set so
- * the same specific weekdays are picked every week -- a predictable routine rather
- * than whatever happens to be most efficient that particular week.
- */
-export function selectWeeklyDays(patient: Patient): Weekday[] {
-  const available = WEEKDAYS.filter((d) => patient.availableDays.includes(d))
-  // Twice a month is one visit in the weeks it applies; which weeks is decided by the caller.
-  const need = patient.visitsPerWeek === null ? null : Math.ceil(patient.visitsPerWeek)
-  if (!need || need >= available.length) return available
-  if (need <= 0) return []
-
-  const chosen = new Set<Weekday>()
-  if (need === 1) {
-    chosen.add(available[Math.floor((available.length - 1) / 2)])
-  } else {
-    for (let i = 0; i < need; i++) {
-      const idx = Math.round((i * (available.length - 1)) / (need - 1))
-      chosen.add(available[idx])
-    }
-  }
-  // rounding can collide on small lists; backfill from the remaining available days if short
-  for (const d of available) {
-    if (chosen.size >= need) break
-    chosen.add(d)
-  }
-
-  return WEEKDAYS.filter((d) => chosen.has(d))
 }
 
 interface ScheduledVisit {

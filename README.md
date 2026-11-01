@@ -26,7 +26,8 @@ change mid-day.
   week from each active patient's own available days -- or build/rebuild a
   single day from its overview screen. A patient seen fewer times than
   they're available (e.g. available Mon/Wed/Fri but only needs 2x/week) gets
-  the same specific days picked every week; twice-a-month patients are seen
+  the same specific days picked every week, spread so no day is packed while
+  another sits nearly empty; twice-a-month patients are seen
   every other week; a patient whose first-choice visit option won't fit that
   week is scheduled with their next option; conflicts (e.g. "Tue 12-1,
   recurring pickup") are treated as hard blocks the router schedules around.
