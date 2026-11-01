@@ -110,6 +110,8 @@ body {
   max-width: 560px;
   margin: 0 auto;
   min-height: 100dvh;
+  /* Installed to the home screen, the app draws under the status bar; keep everything below it. */
+  padding-top: env(safe-area-inset-top);
   background: var(--color-app);
   position: relative;
 }

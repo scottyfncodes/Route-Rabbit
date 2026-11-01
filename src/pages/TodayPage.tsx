@@ -252,7 +252,7 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
   return (
     <div className="flex-1 flex flex-col">
       {onBack && (
-        <button onClick={onBack} className="px-4 pt-5 text-[13px] font-semibold text-accent text-left w-fit">
+        <button onClick={onBack} className="px-4 pt-4 pb-1 min-h-11 text-[14px] font-semibold text-accent text-left w-fit">
           ‹ Back to {backLabel}
         </button>
       )}

@@ -213,7 +213,10 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-app">
-      <header className="flex items-center justify-between px-4 py-4 border-b border-line-soft bg-surface">
+      <header
+        className="flex items-center justify-between px-4 pb-4 border-b border-line-soft bg-surface"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={onCancel} className="text-accent font-semibold text-[16px] px-1">
           Cancel
         </button>
