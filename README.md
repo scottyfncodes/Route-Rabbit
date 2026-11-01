@@ -17,15 +17,18 @@ change mid-day.
 ## What it does
 
 - **Patients by initials only.** No names, DOB, diagnoses, insurance, or other PHI --
-  just initials, address, visit duration, available days, a time window, an
-  optional visits-per-week target, recurring blocked-time conflicts, a scheduling
+  just initials, address, one or more visit options (length and how often, e.g.
+  "60 min 1x a week, or 30 min 2x a week", including twice a month), available
+  days, a time window, recurring blocked-time conflicts, a scheduling
   priority (High/Medium/Low, shown as a small colored dot), and whether they're
   available to fill make-up slots.
 - **Build My Week.** One tap builds an optimized route for every day of the
   week from each active patient's own available days -- or build/rebuild a
   single day from its overview screen. A patient seen fewer times than
   they're available (e.g. available Mon/Wed/Fri but only needs 2x/week) gets
-  the same specific days picked every week; conflicts (e.g. "Tue 12-1,
+  the same specific days picked every week; twice-a-month patients are seen
+  every other week; a patient whose first-choice visit option won't fit that
+  week is scheduled with their next option; conflicts (e.g. "Tue 12-1,
   recurring pickup") are treated as hard blocks the router schedules around.
 - **Live weather, factored into the route.** The Home dashboard shows current
   conditions and a short outlook; a rainy/snowy forecast for a given day

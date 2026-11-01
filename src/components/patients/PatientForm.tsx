@@ -1,12 +1,38 @@
 import { useCallback, useState } from 'react'
 import { lookupAddress } from '../../lib/geocode'
 import { formatTime, toMinutes } from '../../lib/time'
-import { WEEKDAYS, type GeoPoint, type Patient, type PatientConflict, type PatientPriority, type Weekday } from '../../types'
+import { frequencyLabel, sameOption, visitOptionsOf } from '../../lib/visitOptions'
+import {
+  TWICE_A_MONTH,
+  WEEKDAYS,
+  type GeoPoint,
+  type Patient,
+  type PatientConflict,
+  type PatientPriority,
+  type VisitOption,
+  type Weekday,
+} from '../../types'
 import { PriorityDot } from '../ui/PriorityDot'
 import { PinPicker } from './PinPicker'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 75, 90]
-const VISITS_PER_WEEK_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
+const FREQUENCY_CHOICES: Array<{ value: number | null; label: string }> = [
+  { value: TWICE_A_MONTH, label: '2× a month' },
+  { value: 1, label: '1×' },
+  { value: 2, label: '2×' },
+  { value: 3, label: '3×' },
+  { value: 4, label: '4×' },
+  { value: 5, label: '5×' },
+  { value: null, label: 'Every available day' },
+]
+
+/** A sensible second option from the last one: half the length, twice as often (60 min 1× becomes 30 min 2×). */
+function suggestNextOption(last: VisitOption | undefined): VisitOption {
+  if (!last) return { duration: 45, perWeek: 1 }
+  const half = DURATION_PRESETS.filter((d) => d <= last.duration / 2).pop() ?? DURATION_PRESETS[0]
+  const base = last.perWeek === null || last.perWeek === TWICE_A_MONTH ? 1 : last.perWeek
+  return { duration: half, perWeek: Math.min(5, base * 2) }
+}
 const PRIORITY_OPTIONS: Array<{ value: PatientPriority; label: string }> = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
@@ -25,6 +51,7 @@ export interface PatientFormValues {
   windowStart: string
   windowEnd: string
   visitsPerWeek: number | null
+  visitOptions: VisitOption[]
   conflicts: PatientConflict[]
   notes: string
   priority: PatientPriority
@@ -44,7 +71,8 @@ function valuesFrom(patient?: Patient): PatientFormValues {
       availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
       windowStart: '09:00',
       windowEnd: '17:00',
-      visitsPerWeek: null,
+      visitsPerWeek: 1,
+      visitOptions: [{ duration: 45, perWeek: 1 }],
       conflicts: [],
       notes: '',
       priority: 'medium',
@@ -63,6 +91,7 @@ function valuesFrom(patient?: Patient): PatientFormValues {
     windowStart: patient.windowStart,
     windowEnd: patient.windowEnd,
     visitsPerWeek: patient.visitsPerWeek,
+    visitOptions: visitOptionsOf(patient),
     conflicts: patient.conflicts,
     notes: patient.notes ?? '',
     priority: patient.priority,
@@ -94,6 +123,8 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
   const [conflictDay, setConflictDay] = useState<Weekday>('Mon')
   const [conflictStart, setConflictStart] = useState('12:00')
   const [conflictEnd, setConflictEnd] = useState('13:00')
+  // Which visit option is open for editing; the rest show as one-line summaries.
+  const [openOption, setOpenOption] = useState(0)
 
   const set = <K extends keyof PatientFormValues>(key: K, val: PatientFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: val }))
@@ -143,6 +174,24 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
     setValues((prev) => ({ ...prev, geo, geoConfirmed: true }))
   }, [])
 
+  const updateOption = (index: number, changes: Partial<VisitOption>) =>
+    set(
+      'visitOptions',
+      values.visitOptions.map((o, i) => (i === index ? { ...o, ...changes } : o)),
+    )
+
+  const addOption = () => {
+    const next = suggestNextOption(values.visitOptions[values.visitOptions.length - 1])
+    set('visitOptions', [...values.visitOptions, next])
+    setOpenOption(values.visitOptions.length)
+  }
+
+  const removeOption = (index: number) => {
+    if (values.visitOptions.length <= 1) return
+    set('visitOptions', values.visitOptions.filter((_, i) => i !== index))
+    setOpenOption(0)
+  }
+
   const removeConflict = (id: string) => set('conflicts', values.conflicts.filter((c) => c.id !== id))
 
   const handleSubmit = () => {
@@ -152,11 +201,14 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
     if (!values.address.trim()) return setError('Enter a home address.')
     if (values.availableDays.length === 0) return setError('Pick at least one available day.')
     if (values.windowStart >= values.windowEnd) return setError('End time must be after start time.')
-    if (toMinutes(values.windowEnd) - toMinutes(values.windowStart) < values.visitDuration) {
-      return setError(`A ${values.visitDuration}-min visit doesn't fit in a ${formatTime(values.windowStart)}–${formatTime(values.windowEnd)} window.`)
+    // Drop exact repeats, keeping the first of each.
+    const options = values.visitOptions.filter((o, i) => values.visitOptions.findIndex((x) => sameOption(x, o)) === i)
+    const longest = Math.max(...options.map((o) => o.duration))
+    if (toMinutes(values.windowEnd) - toMinutes(values.windowStart) < longest) {
+      return setError(`A ${longest}-min visit doesn't fit in a ${formatTime(values.windowStart)}–${formatTime(values.windowEnd)} window.`)
     }
     setError(null)
-    onSave({ ...values, initials })
+    onSave({ ...values, initials, visitOptions: options, visitDuration: options[0].duration, visitsPerWeek: options[0].perWeek })
   }
 
   return (
@@ -250,20 +302,89 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
         </div>
 
         <div>
-          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Visit duration</label>
-          <div className="grid grid-cols-3 gap-2">
-            {DURATION_PRESETS.map((d) => (
-              <button
-                key={d}
-                onClick={() => set('visitDuration', d)}
-                className={`py-3 rounded-xl font-semibold text-[15px] border-2 ${
-                  values.visitDuration === d ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
-                }`}
-              >
-                {d} min
-              </button>
-            ))}
+          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Visit length and frequency</label>
+          <div className="space-y-2">
+            {values.visitOptions.map((opt, i) => {
+              const many = values.visitOptions.length > 1
+              const tag = !many ? null : i === 0 ? 'First choice' : 'Or'
+              if (i !== openOption) {
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setOpenOption(i)}
+                    className="w-full flex items-center justify-between gap-3 bg-surface rounded-xl border border-line-soft px-3.5 py-3 text-left"
+                  >
+                    <span className="min-w-0">
+                      {tag && <span className="block text-[11.5px] font-bold text-label uppercase tracking-wide">{tag}</span>}
+                      <span className="block text-[15px] font-semibold text-ink">
+                        {opt.duration} min, {frequencyLabel(opt.perWeek)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[13px] font-bold text-accent">Change</span>
+                  </button>
+                )
+              }
+              return (
+                <div key={i} className="bg-surface rounded-2xl border-2 border-primary-600 px-3 py-3 space-y-3">
+                  {many && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11.5px] font-bold text-label uppercase tracking-wide">{tag}</span>
+                      <button onClick={() => removeOption(i)} className="text-danger text-[13px] font-bold px-1">
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[12.5px] font-semibold text-muted mb-1.5">Duration</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {DURATION_PRESETS.map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => updateOption(i, { duration: d })}
+                          className={`py-2.5 rounded-xl font-semibold text-[15px] border-2 ${
+                            opt.duration === d ? 'bg-primary-600 border-primary-600 text-white' : 'bg-app border-line text-ink'
+                          }`}
+                        >
+                          {d} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12.5px] font-semibold text-muted mb-1.5">Times per week</div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {FREQUENCY_CHOICES.map((f) => (
+                        <button
+                          key={f.value ?? 'all'}
+                          onClick={() => updateOption(i, { perWeek: f.value })}
+                          className={`px-3.5 py-2.5 rounded-xl font-semibold text-[14px] border-2 ${
+                            opt.perWeek === f.value ? 'bg-primary-600 border-primary-600 text-white' : 'bg-app border-line text-ink'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    {opt.perWeek === TWICE_A_MONTH && (
+                      <p className="text-[12px] text-subtle mt-1.5">One visit every other week, starting this week.</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            <button
+              onClick={addOption}
+              disabled={values.visitOptions.length >= 4}
+              className="w-full py-2.5 rounded-xl border-2 border-dashed border-line text-accent font-bold text-[13.5px] disabled:opacity-40"
+            >
+              + Add another option
+            </button>
           </div>
+          <p className="text-[12px] text-subtle mt-1.5">
+            {values.visitOptions.length > 1
+              ? "Build My Week schedules the first choice, and switches to the next option when the first one won't fit that week."
+              : 'If they can also be seen another way, like two 30 min visits instead of one hour, add it as another option.'}
+          </p>
         </div>
 
         <div>
@@ -281,25 +402,8 @@ export function PatientForm({ patient, onSave, onCancel, onDelete, fallbackCente
               </button>
             ))}
           </div>
-        </div>
-
-        <div>
-          <label className="block text-[13px] font-bold text-label mb-1.5 uppercase tracking-wide">Visits needed per week</label>
-          <div className="flex gap-1.5 flex-wrap">
-            {VISITS_PER_WEEK_OPTIONS.map((n) => (
-              <button
-                key={n ?? 'any'}
-                onClick={() => set('visitsPerWeek', n)}
-                className={`px-4 py-2.5 rounded-xl font-semibold text-[14px] border-2 ${
-                  values.visitsPerWeek === n ? 'bg-primary-600 border-primary-600 text-white' : 'bg-surface border-line text-ink'
-                }`}
-              >
-                {n === null ? 'Any' : `${n}×`}
-              </button>
-            ))}
-          </div>
           <p className="text-[12px] text-subtle mt-1.5">
-            If fewer than their available days, Build My Week automatically picks which specific days to see them.
+            When they need fewer visits than days they're open, Build My Week picks the same days every week.
           </p>
         </div>
 

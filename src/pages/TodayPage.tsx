@@ -81,6 +81,11 @@ export function TodayPage({ patientsApi, settings, date, onDateChange, onBack, b
       .filter((id) => !cancelledIds.includes(id))
       .map((id) => patientsById.get(id))
       .filter((p): p is Patient => Boolean(p))
+      // Build My Week may have scheduled someone with one of their other visit lengths for this day.
+      .map((p) => {
+        const duration = plan.visitDurations?.[p.id]
+        return duration ? { ...p, visitDuration: duration } : p
+      })
 
     const dayWeather = weather?.daily[date]
 
